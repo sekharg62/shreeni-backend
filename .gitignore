@@ -1,0 +1,24 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+*.tsbuildinfo
+
+# Keep environment variables out of version control
+.env
+.env.*
+!.env.example
+
+# Generated Prisma client (regenerated via `prisma generate`)
+src/generated
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
