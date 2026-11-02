@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter.js';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js';
@@ -22,6 +22,9 @@ async function bootstrap() {
   // Allow the storefront and admin apps to call this API.
   app.enableCors();
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 8080;
+  await app.listen(port);
+
+  Logger.log(`🚀 Server running on http://localhost:${port}`, 'Bootstrap');
 }
 await bootstrap();
