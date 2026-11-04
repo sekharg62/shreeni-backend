@@ -7,6 +7,7 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    seed: "tsx src/prisma/seed.ts",
   },
   datasource: {
     // CLI commands (migrate/db) use the DIRECT session connection (:5432).
