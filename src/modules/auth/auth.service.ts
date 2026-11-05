@@ -16,9 +16,9 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    // Same error whether the email is unknown or the password is wrong,
-    // so we don't leak which emails exist.
-    if (!user) {
+    // Same error whether the email is unknown, the account has no password
+    // (OTP-only user), or the password is wrong — so we don't leak which exist.
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -40,7 +40,10 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        // Kept for the admin UI, which displays a single full name.
+        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || null,
         phone: user.phone,
         role: user.role,
       },

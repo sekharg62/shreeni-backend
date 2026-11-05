@@ -16,14 +16,16 @@ async function main() {
     update: {
       phone: '+916296446556',
       passwordHash,
-      name: 'Sekhar',
+      firstName: 'Sekhar',
+      lastName: 'Ghosh',
       role: 'ADMIN',
     },
     create: {
       email,
       phone: '+916296446556',
       passwordHash,
-      name: 'Sekhar',
+      firstName: 'Sekhar',
+      lastName: 'Ghosh',
       role: 'ADMIN',
     },
   });
