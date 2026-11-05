@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shreeni ERD</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #f1efe9;
+        color: #1f2937;
+      }
+      #toolbar {
+        position: fixed; top: 0; left: 0; right: 0; height: 52px;
+        display: flex; align-items: center; gap: 10px;
+        padding: 0 16px; background: #fff; border-bottom: 1px solid #e3ddcf; z-index: 50;
+      }
+      #toolbar h1 { font-size: 15px; margin: 0; }
+      #toolbar .hint { color: #9ca3af; font-size: 12px; }
+      #toolbar .spacer { flex: 1; }
+      #toolbar button {
+        font: inherit; font-size: 13px; border: 1px solid #e3ddcf; background: #fff;
+        color: #374151; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+      }
+      #toolbar button:hover { background: #f6f3ec; }
+
+      #viewport {
+        position: fixed; inset: 52px 0 0 0; overflow: hidden; cursor: grab;
+        background:
+          radial-gradient(circle, #d9d3c4 1px, transparent 1px);
+        background-size: 22px 22px;
+      }
+      #viewport.panning { cursor: grabbing; }
+      #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+      #links { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+      #links path { stroke: #8a7f6a; stroke-width: 1.5; fill: none; }
+      #links circle { fill: #8a7f6a; }
+
+      .table {
+        position: absolute; width: 230px; background: #fff;
+        border: 1px solid #c9b48a; border-radius: 8px;
+        box-shadow: 0 4px 14px rgba(0,0,0,.08); user-select: none;
+      }
+      .table .thead {
+        background: #650f25; color: #fff; font-weight: 700; font-size: 13px;
+        padding: 7px 10px; border-radius: 7px 7px 0 0; cursor: move;
+        display: flex; align-items: center; gap: 6px;
+      }
+      .table .row {
+        display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+        font-size: 12px; border-top: 1px solid #f0ece2;
+      }
+      .table .row .nm { font-weight: 600; color: #1f2937; }
+      .table .row.pk .nm { color: #650f25; }
+      .table .row .ty { margin-left: auto; color: #9ca3af; font-size: 11px; }
+      .badge {
+        display: inline-flex; min-width: 20px; justify-content: center;
+        font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px;
+      }
+      .badge.pk { background: #fbe8c8; color: #9a6a13; }
+      .badge.fk { background: #dbe7ff; color: #1e49a8; }
+      .badge.none { background: transparent; color: transparent; }
+
+      .table.enums { width: 250px; border-color: #b88646; }
+      .table.enums .thead { background: #b88646; }
+      .enumrow { padding: 5px 10px; border-top: 1px solid #f0ece2; }
+      .enumrow .enm { font-size: 11px; font-weight: 700; color: #8a5a12; }
+      .enumrow .evals { font-size: 10px; color: #6b7280; line-height: 1.5; margin-top: 1px; }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <h1>Shreeni — ERD</h1>
+      <span class="hint">drag a table's header to move · drag empty space to pan · scroll to zoom</span>
+      <span class="spacer"></span>
+      <button onclick="zoomBy(1.1)">Zoom +</button>
+      <button onclick="zoomBy(0.9)">Zoom −</button>
+      <button onclick="resetView()">Reset</button>
+      <button onclick="autoLayout()">Re-layout</button>
+    </div>
+
+    <div id="viewport">
+      <div id="world">
+        <svg id="links"></svg>
+      </div>
+    </div>
+
+    <script>
+      // ---- Schema data -----------------------------------------------------
+      // f: [name, type, key]  key = 'PK' | 'FK' | ''
+      const TABLES = {
+        Category: [['id','uuid','PK'],['name','string',''],['slug','string',''],['parentId','uuid','FK'],['gender','enum',''],['bannerUrl','string',''],['posterUrl','string',''],['sortOrder','int',''],['status','enum','']],
+        Collection: [['id','uuid','PK'],['name','string',''],['slug','string',''],['isActive','bool','']],
+        Product: [['id','uuid','PK'],['name','string',''],['slug','string',''],['categoryId','uuid','FK'],['gender','enum',''],['fabric','string',''],['originalPrice','paise',''],['discountPrice','paise',''],['hsnCode','string',''],['gstRate','int',''],['status','enum',''],['isFeatured','bool','']],
+        ProductImage: [['id','uuid','PK'],['productId','uuid','FK'],['url','string',''],['sortOrder','int',''],['isPrimary','bool','']],
+        ProductVariant: [['id','uuid','PK'],['productId','uuid','FK'],['size','string',''],['sku','string',''],['stock','int',''],['reservedStock','int',''],['priceOverride','paise','']],
+        ProductSpecification: [['id','uuid','PK'],['productId','uuid','FK'],['group','enum',''],['label','string',''],['value','string',''],['sortOrder','int','']],
+        Tag: [['id','uuid','PK'],['name','string',''],['slug','string',''],['color','string','']],
+        Color: [['id','uuid','PK'],['name','string',''],['hexCode','string','']],
+        ProductColor: [['id','uuid','PK'],['productId','uuid','FK'],['colorId','uuid','FK'],['colorType','enum','']],
+        ProductTag: [['id','uuid','PK'],['productId','uuid','FK'],['tagId','uuid','FK']],
+        ProductCollection: [['id','uuid','PK'],['productId','uuid','FK'],['collectionId','uuid','FK']],
+        RelatedProduct: [['id','uuid','PK'],['productId','uuid','FK'],['relatedProductId','uuid','FK']],
+        Review: [['id','uuid','PK'],['productId','uuid','FK'],['userId','uuid','FK'],['rating','int',''],['title','string',''],['body','string',''],['reviewerEmail','string',''],['images','string[]',''],['videos','string[]',''],['status','enum','']],
+        User: [['id','uuid','PK'],['firstName','string',''],['lastName','string',''],['phone','string',''],['email','string',''],['passwordHash','string',''],['role','enum',''],['phoneVerified','bool',''],['emailVerified','bool','']],
+        Address: [['id','uuid','PK'],['userId','uuid','FK'],['label','enum',''],['receiverName','string',''],['receiverPhone','string',''],['flatHouseNo','string',''],['apartmentSector','string',''],['city','string',''],['state','string',''],['pincode','string',''],['isDefault','bool','']],
+        Cart: [['id','uuid','PK'],['userId','uuid','FK'],['sessionId','string','']],
+        CartItem: [['id','uuid','PK'],['cartId','uuid','FK'],['productId','uuid','FK'],['variantId','uuid','FK'],['quantity','int','']],
+        Wishlist: [['id','uuid','PK'],['userId','uuid','FK']],
+        WishlistItem: [['id','uuid','PK'],['wishlistId','uuid','FK'],['productId','uuid','FK']],
+        Order: [['id','uuid','PK'],['orderNumber','string',''],['invoiceNumber','string',''],['userId','uuid','FK'],['contactEmail','string',''],['contactPhone','string',''],['discountId','uuid','FK'],['discountTotal','paise',''],['status','enum',''],['subtotal','paise',''],['grandTotal','paise',''],['shipReceiverName','string',''],['shipPincode','string','']],
+        OrderItem: [['id','uuid','PK'],['orderId','uuid','FK'],['productId','uuid','FK'],['variantId','uuid','FK'],['name','string',''],['unitPrice','paise',''],['quantity','int','']],
+        Payment: [['id','uuid','PK'],['orderId','uuid','FK'],['provider','string',''],['method','enum',''],['amount','paise',''],['status','enum','']],
+        Discount: [['id','uuid','PK'],['code','string',''],['type','enum',''],['value','int',''],['maxDiscountAmount','paise',''],['minOrderValue','paise',''],['usageLimit','int',''],['usedCount','int',''],['perUserLimit','int',''],['startsAt','datetime',''],['endsAt','datetime',''],['isActive','bool','']],
+        Banner: [['id','uuid','PK'],['title','string',''],['imageUrl','string',''],['mobileImageUrl','string',''],['linkUrl','string',''],['sortOrder','int',''],['status','enum','']],
+        Shipment: [['id','uuid','PK'],['orderId','uuid','FK'],['deliveryPartner','string',''],['awb','string',''],['status','enum','']],
+      };
+
+      // [from, to]
+      const LINKS = [
+        ['Category','Category'],['Category','Product'],
+        ['Product','ProductImage'],['Product','ProductVariant'],['Product','ProductSpecification'],
+        ['Product','ProductColor'],['Color','ProductColor'],
+        ['Product','ProductTag'],['Tag','ProductTag'],
+        ['Product','ProductCollection'],['Collection','ProductCollection'],
+        ['Product','RelatedProduct'],
+        ['Product','Review'],['User','Review'],
+        ['User','Address'],['User','Cart'],['Cart','CartItem'],['Product','CartItem'],['ProductVariant','CartItem'],
+        ['User','Wishlist'],['Wishlist','WishlistItem'],['Product','WishlistItem'],
+        ['User','Order'],['Order','OrderItem'],['Product','OrderItem'],['ProductVariant','OrderItem'],
+        ['Discount','Order'],['Order','Payment'],['Order','Shipment'],
+      ];
+
+      const ENUMS = {
+        Role: ['CUSTOMER','ADMIN'],
+        CatalogStatus: ['DRAFT','PUBLISHED','UNPUBLISHED','DISCONTINUED'],
+        Gender: ['WOMEN','MEN','UNISEX','GIRLS','BOYS'],
+        AddressLabel: ['HOME','WORK','OTHER'],
+        ColorType: ['PRIMARY','SECONDARY'],
+        SpecGroup: ['DETAILS','MANUFACTURING'],
+        ReviewStatus: ['PENDING','APPROVED','REJECTED'],
+        OrderStatus: ['PENDING','CONFIRMED','PACKED','SHIPPED','DELIVERED','CANCELLED','RETURNED'],
+        DiscountType: ['PERCENTAGE','FLAT'],
+        PaymentMethod: ['PREPAID','COD'],
+        PaymentStatus: ['CREATED','PAID','FAILED','REFUNDED'],
+        ShipmentStatus: ['PENDING','SHIPPED','IN_TRANSIT','DELIVERED','RETURNED','CANCELLED'],
+      };
+
+      // Rough column groups for the initial layout. Enums sit on the far left.
+      const COLUMNS = [
+        ['Enums'],
+        ['User','Address','Cart','Wishlist'],
+        ['Category','Collection','Tag','Color','Banner'],
+        ['Product','ProductImage','ProductVariant','ProductSpecification'],
+        ['ProductColor','ProductTag','ProductCollection','RelatedProduct','Review'],
+        ['CartItem','WishlistItem','Discount'],
+        ['Order','OrderItem','Payment','Shipment'],
+      ];
+
+      // ---- Render ----------------------------------------------------------
+      const world = document.getElementById('world');
+      const svg = document.getElementById('links');
+      const viewport = document.getElementById('viewport');
+      const nodes = {}; // name -> {el, x, y, w, h}
+
+      function makeTable(name, fields) {
+        const el = document.createElement('div');
+        el.className = 'table';
+        const head = document.createElement('div');
+        head.className = 'thead';
+        head.textContent = name;
+        el.appendChild(head);
+        for (const [fn, ft, key] of fields) {
+          const row = document.createElement('div');
+          row.className = 'row' + (key === 'PK' ? ' pk' : '');
+          const badge = document.createElement('span');
+          badge.className = 'badge ' + (key ? key.toLowerCase() : 'none');
+          badge.textContent = key || '•';
+          const nm = document.createElement('span');
+          nm.className = 'nm'; nm.textContent = fn;
+          const ty = document.createElement('span');
+          ty.className = 'ty'; ty.textContent = ft;
+          row.append(badge, nm, ty);
+          el.appendChild(row);
+        }
+        world.appendChild(el);
+        el.addEventListener('pointerdown', (e) => startDragTable(e, name));
+        return el;
+      }
+
+      function makeEnumsBox(enums) {
+        const el = document.createElement('div');
+        el.className = 'table enums';
+        const head = document.createElement('div');
+        head.className = 'thead';
+        head.textContent = 'Enums';
+        el.appendChild(head);
+        for (const [name, values] of Object.entries(enums)) {
+          const row = document.createElement('div');
+          row.className = 'enumrow';
+          const nm = document.createElement('div');
+          nm.className = 'enm'; nm.textContent = name;
+          const vs = document.createElement('div');
+          vs.className = 'evals'; vs.textContent = values.join(' · ');
+          row.append(nm, vs);
+          el.appendChild(row);
+        }
+        world.appendChild(el);
+        el.addEventListener('pointerdown', (e) => startDragTable(e, 'Enums'));
+        return el;
+      }
+
+      function autoLayout() {
+        let x = 40;
+        for (const col of COLUMNS) {
+          let y = 40;
+          let maxW = 0;
+          for (const name of col) {
+            const n = nodes[name];
+            n.x = x; n.y = y;
+            place(n);
+            maxW = Math.max(maxW, n.w);
+            y += n.h + 36;
+          }
+          x += maxW + 90;
+        }
+        drawLinks();
+      }
+
+      function place(n) {
+        n.w = n.el.offsetWidth;
+        n.h = n.el.offsetHeight;
+        n.el.style.left = n.x + 'px';
+        n.el.style.top = n.y + 'px';
+      }
+
+      function border(n, tx, ty) {
+        const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+        const dx = tx - cx, dy = ty - cy;
+        if (!dx && !dy) return { x: cx, y: cy };
+        const sx = dx ? (n.w / 2) / Math.abs(dx) : Infinity;
+        const sy = dy ? (n.h / 2) / Math.abs(dy) : Infinity;
+        const s = Math.min(sx, sy);
+        return { x: cx + dx * s, y: cy + dy * s };
+      }
+
+      function drawLinks() {
+        let out = '';
+        for (const [a, b] of LINKS) {
+          const na = nodes[a], nb = nodes[b];
+          if (!na || !nb) continue;
+          if (a === b) {
+            // self loop
+            const x = na.x + na.w, y = na.y + na.h / 2;
+            out += `<path d="M ${x} ${y} c 40 -20 40 40 0 20" />`;
+            out += `<circle cx="${x}" cy="${y}" r="3" />`;
+            continue;
+          }
+          const ca = { x: na.x + na.w / 2, y: na.y + na.h / 2 };
+          const cb = { x: nb.x + nb.w / 2, y: nb.y + nb.h / 2 };
+          const pa = border(na, cb.x, cb.y);
+          const pb = border(nb, ca.x, ca.y);
+          const mx = (pa.x + pb.x) / 2;
+          out += `<path d="M ${pa.x} ${pa.y} C ${mx} ${pa.y} ${mx} ${pb.y} ${pb.x} ${pb.y}" />`;
+          out += `<circle cx="${pa.x}" cy="${pa.y}" r="3" /><circle cx="${pb.x}" cy="${pb.y}" r="3" />`;
+        }
+        svg.innerHTML = out;
+      }
+
+      // ---- Interaction -----------------------------------------------------
+      let scale = 1, panX = 0, panY = 0;
+      function applyView() {
+        world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      }
+      function zoomBy(f) { scale = Math.min(2.5, Math.max(0.2, scale * f)); applyView(); }
+      function resetView() { scale = 1; panX = 0; panY = 0; applyView(); }
+
+      // drag a table
+      let dragName = null, dragStart = null, nodeStart = null;
+      function startDragTable(e, name) {
+        e.stopPropagation();
+        dragName = name;
+        dragStart = { x: e.clientX, y: e.clientY };
+        nodeStart = { x: nodes[name].x, y: nodes[name].y };
+        e.target.setPointerCapture(e.pointerId);
+      }
+
+      // pan background
+      let panning = false, panStart = null, panOrigin = null;
+      viewport.addEventListener('pointerdown', (e) => {
+        if (dragName) return;
+        panning = true;
+        viewport.classList.add('panning');
+        panStart = { x: e.clientX, y: e.clientY };
+        panOrigin = { x: panX, y: panY };
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (dragName) {
+          const n = nodes[dragName];
+          n.x = nodeStart.x + (e.clientX - dragStart.x) / scale;
+          n.y = nodeStart.y + (e.clientY - dragStart.y) / scale;
+          n.el.style.left = n.x + 'px';
+          n.el.style.top = n.y + 'px';
+          drawLinks();
+        } else if (panning) {
+          panX = panOrigin.x + (e.clientX - panStart.x);
+          panY = panOrigin.y + (e.clientY - panStart.y);
+          applyView();
+        }
+      });
+      window.addEventListener('pointerup', () => {
+        dragName = null; panning = false;
+        viewport.classList.remove('panning');
+      });
+
+      // wheel zoom toward cursor
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        const prev = scale;
+        scale = Math.min(2.5, Math.max(0.2, scale * (e.deltaY < 0 ? 1.1 : 0.9)));
+        // keep the point under the cursor stable
+        panX = mx - (mx - panX) * (scale / prev);
+        panY = my - (my - panY) * (scale / prev);
+        applyView();
+      }, { passive: false });
+
+      // ---- Boot ------------------------------------------------------------
+      nodes['Enums'] = { el: makeEnumsBox(ENUMS), x: 0, y: 0, w: 0, h: 0 };
+      for (const [name, fields] of Object.entries(TABLES)) {
+        nodes[name] = { el: makeTable(name, fields), x: 0, y: 0, w: 0, h: 0 };
+      }
+      autoLayout();
+    </script>
+  </body>
+</html>
