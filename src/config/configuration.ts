@@ -16,4 +16,8 @@ export default () => ({
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
   },
+  s3: {
+    // Returned by the image uploader until real S3 upload is integrated.
+    dummyImageUrl: process.env.S3_DUMMY_IMAGE_URL,
+  },
 });
