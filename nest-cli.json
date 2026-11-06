@@ -5,7 +5,20 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [
-      { "include": "**/*.json", "exclude": "**/*.spec.json", "watchAssets": true }
+      {
+        "include": "**/*.json",
+        "exclude": "**/*.spec.json",
+        "watchAssets": true
+      }
+    ],
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "classValidatorShim": true,
+          "introspectComments": true
+        }
+      }
     ]
   }
 }

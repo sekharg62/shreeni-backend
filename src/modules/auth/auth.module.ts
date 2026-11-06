@@ -6,7 +6,9 @@ import { AuthService } from './auth.service.js';
 
 @Module({
   imports: [
+    // Global so the admin guard (src/common/authz) can verify tokens in every module.
     JwtModule.registerAsync({
+      global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('jwt.secret'),

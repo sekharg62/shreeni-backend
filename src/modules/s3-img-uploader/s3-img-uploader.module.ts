@@ -1,10 +1,17 @@
 import { Module } from '@nestjs/common';
-import { S3ImgUploaderController } from './s3-img-uploader.controller.js';
-import { S3ImgUploaderService } from './s3-img-uploader.service.js';
+import { ImageProcessorService } from './image-processor.service.js';
+import { ImageUploadService } from './image-upload.service.js';
+import { S3StorageService } from './s3-storage.service.js';
+import { UploadsController } from './uploads.controller.js';
+import { UploadCleanupService } from './upload-cleanup.service.js';
 
+/**
+ * Shared image storage: S3 upload/delete + WebP optimisation.
+ * Imported by Products, Product images, Categories and Banners.
+ */
 @Module({
-  controllers: [S3ImgUploaderController],
-  providers: [S3ImgUploaderService],
-  exports: [S3ImgUploaderService],
+  controllers: [UploadsController],
+  providers: [S3StorageService, ImageProcessorService, ImageUploadService, UploadCleanupService],
+  exports: [S3StorageService, ImageUploadService],
 })
 export class S3ImgUploaderModule {}

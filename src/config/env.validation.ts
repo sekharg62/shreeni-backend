@@ -37,6 +37,23 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   JWT_EXPIRES_IN?: string;
+
+  // AWS S3 (image uploads)
+  @IsString()
+  @IsNotEmpty()
+  AWS_REGION!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  AWS_S3_BUCKET!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  AWS_ACCESS_KEY_ID!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  AWS_SECRET_ACCESS_KEY!: string;
 }
 
 // Fail fast on boot if a required env var is missing/malformed.

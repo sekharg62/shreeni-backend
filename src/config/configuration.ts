@@ -16,8 +16,10 @@ export default () => ({
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
   },
-  s3: {
-    // Returned by the image uploader until real S3 upload is integrated.
-    dummyImageUrl: process.env.S3_DUMMY_IMAGE_URL,
+  aws: {
+    region: process.env.AWS_REGION,
+    s3Bucket: process.env.AWS_S3_BUCKET,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
