@@ -10,6 +10,10 @@ import type {
   ReplaceBannerDto,
   UpdateBannerDto,
 } from './dto/banner.dto.js';
+import type { PublicBannerDto } from './dto/public-banner.dto.js';
+
+/** A hero carousel never needs more than this. */
+const MAX_PUBLIC_BANNERS = 20;
 
 @Injectable()
 export class BannersService {
@@ -32,6 +36,16 @@ export class BannersService {
       this.prisma.banner.count({ where }),
     ]);
     return paginated(data, total, q.page, q.limit);
+  }
+
+  /** Storefront list: published only, admin order, display fields only. */
+  findPublished(): Promise<PublicBannerDto[]> {
+    return this.prisma.banner.findMany({
+      where: { status: 'PUBLISHED' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      select: { title: true, subtitle: true, imageUrl: true, mobileImageUrl: true, linkUrl: true },
+      take: MAX_PUBLIC_BANNERS,
+    });
   }
 
   async findOne(id: string) {
