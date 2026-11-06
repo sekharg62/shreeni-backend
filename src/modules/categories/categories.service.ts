@@ -18,6 +18,7 @@ import type {
   ReplaceCategoryDto,
   UpdateCategoryDto,
 } from './dto/category.dto.js';
+import type { PublicCategoryCardDto } from './dto/public-category.dto.js';
 
 export type TreeNode = {
   id: string;
@@ -111,6 +112,25 @@ export class CategoriesService {
       ),
     );
     return this.tree();
+  }
+
+  /**
+   * Storefront: published direct children of the category with this slug.
+   * One query, three columns per child. 404 when the slug doesn't exist.
+   */
+  async findPublishedChildren(slug: string): Promise<PublicCategoryCardDto[]> {
+    const parent = await this.prisma.category.findUnique({
+      where: { slug },
+      select: {
+        children: {
+          where: { status: 'PUBLISHED' },
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          select: { name: true, slug: true, posterUrl: true },
+        },
+      },
+    });
+    if (!parent) throw new NotFoundException(`Category "${slug}" not found`);
+    return parent.children;
   }
 
   async findOne(id: string) {
