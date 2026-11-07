@@ -38,6 +38,11 @@ class EnvironmentVariables {
   @IsString()
   JWT_EXPIRES_IN?: string;
 
+  /** Storefront customer token lifetime, e.g. "7d" (default). */
+  @IsOptional()
+  @IsString()
+  CUSTOMER_JWT_EXPIRES_IN?: string;
+
   // AWS S3 (image uploads)
   @IsString()
   @IsNotEmpty()

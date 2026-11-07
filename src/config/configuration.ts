@@ -15,6 +15,8 @@ export default () => ({
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+    /** Storefront customers stay signed in longer than admins. */
+    customerExpiresIn: process.env.CUSTOMER_JWT_EXPIRES_IN ?? '7d',
   },
   aws: {
     region: process.env.AWS_REGION,
