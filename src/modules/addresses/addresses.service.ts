@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizeIndianPhone } from '../auth/phone.js';
+import { PincodesService } from '../pincodes/pincodes.service.js';
 import type { AddressDto, CreateAddressDto, UpdateAddressDto } from './dto/address.dto.js';
 
 export const MAX_ADDRESSES = 10;
@@ -26,7 +27,10 @@ const ADDRESS_ORDER = [{ isDefault: 'desc' as const }, { createdAt: 'desc' as co
 
 @Injectable()
 export class AddressesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pincodes: PincodesService,
+  ) {}
 
   list(userId: string): Promise<AddressDto[]> {
     return this.prisma.address.findMany({ where: { userId }, orderBy: ADDRESS_ORDER, select: ADDRESS_SELECT });
@@ -37,6 +41,7 @@ export class AddressesService {
     if (count >= MAX_ADDRESSES) {
       throw new BadRequestException(`You can save up to ${MAX_ADDRESSES} addresses. Delete one to add another.`);
     }
+    await this.pincodes.assertValidForState(dto.pincode, dto.state);
     return this.prisma.address.create({
       data: {
         ...this.clean(dto),
@@ -55,7 +60,11 @@ export class AddressesService {
   }
 
   async update(userId: string, id: string, dto: UpdateAddressDto): Promise<AddressDto> {
-    await this.own(userId, id);
+    const current = await this.own(userId, id);
+    if (dto.pincode !== undefined || dto.state !== undefined) {
+      // Check the address as it will be after the edit.
+      await this.pincodes.assertValidForState(dto.pincode ?? current.pincode, dto.state ?? current.state);
+    }
     return this.prisma.address.update({
       where: { id },
       data: {
@@ -102,7 +111,7 @@ export class AddressesService {
   private async own(userId: string, id: string) {
     const address = await this.prisma.address.findFirst({
       where: { id, userId },
-      select: { id: true, isDefault: true },
+      select: { id: true, isDefault: true, pincode: true, state: true },
     });
     if (!address) throw new NotFoundException('Address not found');
     return address;

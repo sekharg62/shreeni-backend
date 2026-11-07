@@ -632,3 +632,43 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reference data
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The 28 states and 8 union territories. `name` uses the same spelling as INDIAN_STATES (and saved addresses).
+model State {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique // "West Bengal"
+
+  districts District[]
+  pincodes  Pincode[]
+}
+
+model District {
+  id      String @id @default(uuid()) @db.Uuid
+  name    String // "North 24 Parganas"
+  stateId String @db.Uuid
+
+  state    State     @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  pincodes Pincode[]
+
+  @@unique([stateId, name])
+}
+
+/// India Post PIN codes (data.gov.in "All India Pincode Directory"), loaded by `npm run db:import-pincodes`.
+model Pincode {
+  id         String   @id @default(uuid()) @db.Uuid
+  pincode    String   @unique // "743134"
+  stateId    String   @db.Uuid
+  /// null for the few PIN codes India Post lists without a district.
+  districtId String?  @db.Uuid
+  updatedAt  DateTime @updatedAt
+
+  state    State     @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  district District? @relation(fields: [districtId], references: [id], onDelete: SetNull)
+
+  @@index([stateId])
+  @@index([districtId])
+}

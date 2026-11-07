@@ -24,6 +24,7 @@ import { AddressesModule } from './modules/addresses/addresses.module.js';
 import { WishlistModule } from './modules/wishlist/wishlist.module.js';
 import { SupportModule } from './modules/support/support.module.js';
 import { CartModule } from './modules/cart/cart.module.js';
+import { PincodesModule } from './modules/pincodes/pincodes.module.js';
 import configuration from './config/configuration.js';
 import { validateEnv } from './config/env.validation.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
@@ -57,6 +58,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware.j
     WishlistModule,
     SupportModule,
     CartModule,
+    PincodesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

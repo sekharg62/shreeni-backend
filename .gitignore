@@ -22,3 +22,6 @@ npm-debug.log*
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Large reference data files (imported into the DB, not deployed)
+prisma/data/*.csv

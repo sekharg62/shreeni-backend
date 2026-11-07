@@ -25,6 +25,7 @@
     "prisma:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
+    "db:import-pincodes": "tsx src/scripts/import-pincodes.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
