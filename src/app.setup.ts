@@ -10,7 +10,9 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js
  * Used by `main.ts` (local / long-running server) and `api/index.js` (Vercel serverless).
  */
 export async function createApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule);
+  // abortOnError: false → a startup failure throws instead of calling process.exit(1),
+  // so the Vercel handler can report it rather than the function dying silently.
+  const app = await NestFactory.create(AppModule, { abortOnError: false });
 
   // Validate and strip request payloads against the DTOs.
   app.useGlobalPipes(
