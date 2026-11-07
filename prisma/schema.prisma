@@ -97,6 +97,23 @@ enum ShipmentStatus {
   CANCELLED
 }
 
+enum SupportReason {
+  ORDER_ISSUE
+  PAYMENT
+  DELIVERY
+  RETURN_REFUND
+  PRODUCT_QUALITY
+  ACCOUNT
+  OTHER
+}
+
+enum SupportStatus {
+  OPEN // new, or the customer replied
+  IN_PROGRESS // an admin has replied
+  RESOLVED // admin marked it done; a customer reply reopens it
+  CLOSED // final, no more replies
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Catalog
 // ─────────────────────────────────────────────────────────────────────────────
@@ -359,6 +376,9 @@ model User {
   cart      Cart?
   wishlist  Wishlist?
   orders    Order[]
+
+  supportTickets  SupportTicket[]
+  supportMessages SupportMessage[]
 }
 
 model Address {
@@ -572,4 +592,42 @@ model Banner {
   updatedAt      DateTime      @updatedAt
 
   @@index([status, sortOrder])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Support
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A customer's help request. The customer's first words live in `description`; replies are SupportMessage rows.
+model SupportTicket {
+  id            String        @id @default(uuid()) @db.Uuid
+  ticketNumber  Int           @unique @default(autoincrement()) // shown as "SUP-1042"
+  userId        String        @db.Uuid
+  reason        SupportReason
+  description   String        @db.Text
+  status        SupportStatus @default(OPEN)
+  lastMessageAt DateTime      @default(now()) // inbox sorting
+  closedAt      DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([userId, lastMessageAt])
+  @@index([status, lastMessageAt])
+}
+
+model SupportMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  ticketId   String   @db.Uuid
+  senderId   String   @db.Uuid
+  senderRole Role // CUSTOMER or ADMIN, recorded at send time
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
