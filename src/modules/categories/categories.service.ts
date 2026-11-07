@@ -18,7 +18,11 @@ import type {
   ReplaceCategoryDto,
   UpdateCategoryDto,
 } from './dto/category.dto.js';
-import type { PublicCategoryCardDto } from './dto/public-category.dto.js';
+import type {
+  CategoryCrumbDto,
+  PublicCategoryCardDto,
+  PublicCategoryDetailDto,
+} from './dto/public-category.dto.js';
 
 export type TreeNode = {
   id: string;
@@ -131,6 +135,47 @@ export class CategoriesService {
     });
     if (!parent) throw new NotFoundException(`Category "${slug}" not found`);
     return parent.children;
+  }
+
+  /** Storefront: a published category's header fields + its parent chain for the breadcrumb. */
+  async findPublishedBySlug(slug: string): Promise<PublicCategoryDetailDto> {
+    const category = await this.prisma.category.findFirst({
+      where: { slug, status: 'PUBLISHED' },
+      select: {
+        name: true,
+        slug: true,
+        description: true,
+        bannerUrl: true,
+        posterUrl: true,
+        parentId: true,
+      },
+    });
+    if (!category) throw new NotFoundException(`Category "${slug}" not found`);
+
+    // Walk up the tree (it is shallow); guard against a corrupted cycle.
+    const ancestors: CategoryCrumbDto[] = [];
+    let parentId = category.parentId;
+    for (let depth = 0; parentId && depth < 10; depth++) {
+      const parent = await this.prisma.category.findUnique({
+        where: { id: parentId },
+        select: { name: true, slug: true, status: true, parentId: true },
+      });
+      if (!parent) break;
+      ancestors.unshift({
+        name: parent.name,
+        slug: parent.status === 'PUBLISHED' ? parent.slug : null,
+      });
+      parentId = parent.parentId;
+    }
+
+    return {
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      bannerUrl: category.bannerUrl,
+      posterUrl: category.posterUrl,
+      ancestors,
+    };
   }
 
   async findOne(id: string) {

@@ -12,6 +12,10 @@ import type {
   ReplaceProductDto,
   UpdateProductDto,
 } from './dto/product.dto.js';
+import type {
+  PublicProductPageDto,
+  PublicProductQueryDto,
+} from './dto/public-product.dto.js';
 
 /** Everything the admin product page needs. */
 const PRODUCT_DETAIL_INCLUDE = {
@@ -33,6 +37,63 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly storage: S3StorageService,
   ) {}
+
+  /**
+   * Storefront: published products in a published category or any published
+   * sub-category, as cards. Selects only what a card shows.
+   */
+  async findPublishedCards(q: PublicProductQueryDto): Promise<PublicProductPageDto> {
+    const root = await this.prisma.category.findFirst({
+      where: { slug: q.category, status: 'PUBLISHED' },
+      select: { id: true },
+    });
+    if (!root) throw new NotFoundException(`Category "${q.category}" not found`);
+
+    // Collect the published subtree (the category table is small).
+    const published = await this.prisma.category.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { id: true, parentId: true },
+    });
+    const categoryIds = [root.id];
+    for (let i = 0; i < categoryIds.length; i++) {
+      for (const c of published) if (c.parentId === categoryIds[i]) categoryIds.push(c.id);
+    }
+
+    const where = { status: 'PUBLISHED' as const, categoryId: { in: categoryIds } };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { publishedAt: 'desc' }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          originalPrice: true,
+          discountPrice: true,
+          images: {
+            orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+            take: 1,
+            select: { url: true },
+          },
+        },
+        ...pageArgs(q.page, q.limit),
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    const data = rows.map((p) => {
+      const onSale = p.discountPrice !== null && p.discountPrice < p.originalPrice;
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: onSale ? p.discountPrice! : p.originalPrice,
+        compareAtPrice: onSale ? p.originalPrice : null,
+        imageUrl: p.images[0]?.url ?? null,
+      };
+    });
+    return paginated(data, total, q.page, q.limit);
+  }
 
   async findAll(q: QueryProductDto) {
     const where = {
