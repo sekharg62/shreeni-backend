@@ -10,7 +10,7 @@ import type {
 } from './dto/public-product.dto.js';
 
 /** Highest quantity the storefront is told about; exact stock stays private. */
-const MAX_ORDERABLE = 10;
+export const MAX_ORDERABLE = 10;
 
 /** Columns a product card needs. */
 export const CARD_SELECT = {
@@ -43,7 +43,7 @@ export type CardRow = {
 };
 
 /** Effective price + struck-through price, in paise. */
-function pricing(originalPrice: number, discountPrice: number | null) {
+export function pricing(originalPrice: number, discountPrice: number | null) {
   const onSale = discountPrice !== null && discountPrice < originalPrice;
   return {
     price: onSale ? discountPrice : originalPrice,
