@@ -21,6 +21,7 @@ import { ProductColorsModule } from './modules/product-colors/product-colors.mod
 import { RelatedProductsModule } from './modules/related-products/related-products.module.js';
 import { ReviewsModule } from './modules/reviews/reviews.module.js';
 import { AddressesModule } from './modules/addresses/addresses.module.js';
+import { WishlistModule } from './modules/wishlist/wishlist.module.js';
 import configuration from './config/configuration.js';
 import { validateEnv } from './config/env.validation.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
@@ -51,6 +52,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware.j
     RelatedProductsModule,
     ReviewsModule,
     AddressesModule,
+    WishlistModule,
   ],
   controllers: [AppController],
   providers: [AppService],

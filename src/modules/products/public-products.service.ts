@@ -13,7 +13,7 @@ import type {
 const MAX_ORDERABLE = 10;
 
 /** Columns a product card needs. */
-const CARD_SELECT = {
+export const CARD_SELECT = {
   id: true,
   name: true,
   slug: true,
@@ -33,7 +33,7 @@ const CARD_ORDER = [
   { publishedAt: 'desc' as const },
 ];
 
-type CardRow = {
+export type CardRow = {
   id: string;
   name: string;
   slug: string;
@@ -51,7 +51,7 @@ function pricing(originalPrice: number, discountPrice: number | null) {
   };
 }
 
-function toCard(p: CardRow): PublicProductCardDto {
+export function toCard(p: CardRow): PublicProductCardDto {
   return {
     id: p.id,
     name: p.name,
