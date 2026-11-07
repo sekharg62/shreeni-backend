@@ -9,7 +9,7 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { RateLimit } from '../../common/rate-limit/rate-limit.guard.js';
 import { JwtAuthGuard } from '../../common/authz/jwt-auth.guard.js';
 import { Roles, RolesGuard } from '../../common/authz/roles.guard.js';
 import type { AuthenticatedRequest } from '../../common/authz/auth-user.js';
@@ -49,9 +49,9 @@ export class PublicReviewsController {
   }
 
   @Post()
-  @UseGuards(ThrottlerGuard, JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('CUSTOMER')
-  @Throttle({ auth: { limit: 5, ttl: 60 * 60_000 } })
+  @RateLimit(5, 60 * 60_000)
   @ApiBearerAuth()
   @ApiCreatedResponse({ type: MyReviewDto, description: 'Saved as PENDING until approved' })
   @ApiUnauthorizedResponse({ description: 'Not signed in' })

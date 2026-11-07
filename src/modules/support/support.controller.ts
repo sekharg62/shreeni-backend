@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
@@ -7,7 +7,7 @@ import {
   ApiTags,
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { RateLimit } from '../../common/rate-limit/rate-limit.guard.js';
 import { CustomerOnly } from '../../common/authz/customer-only.decorator.js';
 import type { AuthenticatedRequest } from '../../common/authz/auth-user.js';
 import {
@@ -27,8 +27,7 @@ export class SupportController {
   constructor(private readonly support: SupportService) {}
 
   @Post()
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ auth: { limit: 5, ttl: 60 * 60_000 } })
+  @RateLimit(5, 60 * 60_000)
   @ApiCreatedResponse({ type: SupportTicketDetailDto })
   @ApiBadRequestResponse({ description: 'Invalid input, or too many open requests' })
   @ApiTooManyRequestsResponse({ description: 'Too many new requests' })
@@ -50,8 +49,7 @@ export class SupportController {
   }
 
   @Post(':id/messages')
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ auth: { limit: 30, ttl: 15 * 60_000 } })
+  @RateLimit(30, 15 * 60_000)
   @ApiCreatedResponse({ type: SupportTicketDetailDto, description: 'The ticket with the new message' })
   @ApiBadRequestResponse({ description: 'Ticket is closed' })
   @ApiNotFoundResponse()
