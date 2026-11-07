@@ -3,11 +3,12 @@ import { S3ImgUploaderModule } from '../s3-img-uploader/s3-img-uploader.module.j
 import { ProductsController } from './products.controller.js';
 import { ProductsService } from './products.service.js';
 import { PublicProductsController } from './public-products.controller.js';
+import { PublicProductsService } from './public-products.service.js';
 
 @Module({
   imports: [S3ImgUploaderModule],
   controllers: [ProductsController, PublicProductsController],
-  providers: [ProductsService],
+  providers: [ProductsService, PublicProductsService],
   exports: [ProductsService],
 })
 export class ProductsModule {}
