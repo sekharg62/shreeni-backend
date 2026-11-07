@@ -20,6 +20,7 @@ import { ProductCollectionsModule } from './modules/product-collections/product-
 import { ProductColorsModule } from './modules/product-colors/product-colors.module.js';
 import { RelatedProductsModule } from './modules/related-products/related-products.module.js';
 import { ReviewsModule } from './modules/reviews/reviews.module.js';
+import { AddressesModule } from './modules/addresses/addresses.module.js';
 import configuration from './config/configuration.js';
 import { validateEnv } from './config/env.validation.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
@@ -49,6 +50,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware.j
     ProductColorsModule,
     RelatedProductsModule,
     ReviewsModule,
+    AddressesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
