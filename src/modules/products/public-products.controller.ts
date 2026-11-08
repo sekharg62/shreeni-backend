@@ -1,6 +1,9 @@
 import { Controller, Get, Header, Param, Query } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { PublicProductsService } from './public-products.service.js';
+import { ProductSearchService } from './product-search.service.js';
+import { RateLimit } from '../../common/rate-limit/rate-limit.guard.js';
+import { SearchQueryDto, SearchSuggestionsDto, SuggestQueryDto } from './dto/search.dto.js';
 import {
   ProductFacetsDto,
   ProductSlugParamDto,
@@ -18,7 +21,10 @@ const CACHE = 'public, max-age=60, stale-while-revalidate=300';
 @ApiTags('Storefront · Products')
 @Controller('products')
 export class PublicProductsController {
-  constructor(private readonly products: PublicProductsService) {}
+  constructor(
+    private readonly products: PublicProductsService,
+    private readonly search_: ProductSearchService,
+  ) {}
 
   /** Published products of a category (and its sub-categories), paginated. */
   @Get()
@@ -27,6 +33,24 @@ export class PublicProductsController {
   @ApiNotFoundResponse({ description: 'No published category with that slug' })
   list(@Query() q: PublicProductQueryDto): Promise<PublicProductPageDto> {
     return this.products.findCards(q);
+  }
+
+  /** Full-text product search (typo tolerant), ranked by relevance or sorted. Declared before ':slug'. */
+  @Get('search')
+  @RateLimit(120, 60_000)
+  @Header('Cache-Control', CACHE)
+  @ApiOkResponse({ type: PublicProductPageDto })
+  search(@Query() q: SearchQueryDto): Promise<PublicProductPageDto> {
+    return this.search_.search(q);
+  }
+
+  /** Search-as-you-type: matching categories and the top products. Declared before ':slug'. */
+  @Get('suggest')
+  @RateLimit(300, 60_000)
+  @Header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120')
+  @ApiOkResponse({ type: SearchSuggestionsDto })
+  suggest(@Query() q: SuggestQueryDto): Promise<SearchSuggestionsDto> {
+    return this.search_.suggest(q.q);
   }
 
   /** Filter options (colours, tags, price, offers, stock) with counts. Declared before ':slug'. */

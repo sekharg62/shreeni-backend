@@ -207,6 +207,8 @@ model Product {
   @@index([isFeatured])
   @@index([categoryId, status, sellingPrice])
   @@index([categoryId, status, discountPercent])
+  /// Trigram index for storefront search (fast ILIKE '%…%' and typo-tolerant matching on names).
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Product_name_trgm_idx")
 }
 
 model ProductImage {
