@@ -24,6 +24,8 @@ export const CARD_SELECT = {
     take: 1,
     select: { url: true },
   },
+  // Only what's needed to tell whether any size can be bought.
+  variants: { where: { isActive: true }, select: { stock: true, reservedStock: true } },
 };
 
 /** Default storefront order: featured, admin order, newest. */
@@ -40,6 +42,7 @@ export type CardRow = {
   originalPrice: number;
   discountPrice: number | null;
   images: { url: string }[];
+  variants: { stock: number; reservedStock: number }[];
 };
 
 /** Effective price + struck-through price, in paise. */
@@ -58,6 +61,8 @@ export function toCard(p: CardRow): PublicProductCardDto {
     slug: p.slug,
     ...pricing(p.originalPrice, p.discountPrice),
     imageUrl: p.images[0]?.url ?? null,
+    // Same rule as the product page: some active size has stock left after reservations.
+    inStock: p.variants.some((v) => v.stock - v.reservedStock > 0),
   };
 }
 

@@ -11,7 +11,7 @@ const P2 = '44444444-4444-4444-8444-444444444444';
 const P3 = '55555555-5555-4555-8555-555555555555';
 
 const row = (id: string) => ({
-  product: { id, name: `Saree ${id.slice(0, 4)}`, slug: `saree-${id.slice(0, 4)}`, originalPrice: 500000, discountPrice: 400000, images: [{ url: `https://img/${id}.jpg` }] },
+  product: { id, name: `Saree ${id.slice(0, 4)}`, slug: `saree-${id.slice(0, 4)}`, originalPrice: 500000, discountPrice: 400000, images: [{ url: `https://img/${id}.jpg` }], variants: [{ stock: 3, reservedStock: 1 }] },
 });
 
 function setup() {
@@ -46,7 +46,7 @@ describe('WishlistService', () => {
         }),
       );
       expect(cards).toEqual([
-        { id: P1, name: 'Saree 3333', slug: 'saree-3333', price: 400000, compareAtPrice: 500000, imageUrl: `https://img/${P1}.jpg` },
+        { id: P1, name: 'Saree 3333', slug: 'saree-3333', price: 400000, compareAtPrice: 500000, imageUrl: `https://img/${P1}.jpg`, inStock: true },
       ]);
     });
   });

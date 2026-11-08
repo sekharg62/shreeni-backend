@@ -48,6 +48,9 @@ export class PublicProductCardDto {
 
   @ApiProperty({ type: String, nullable: true, description: 'Main photo (or first by order)' })
   imageUrl!: string | null;
+
+  @ApiProperty({ description: 'false when every size is sold out' })
+  inStock!: boolean;
 }
 
 class PageMetaDto {
