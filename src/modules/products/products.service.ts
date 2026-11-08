@@ -12,6 +12,7 @@ import type {
   ReplaceProductDto,
   UpdateProductDto,
 } from './dto/product.dto.js';
+import { derivedPrices } from './derived-prices.js';
 
 /** Everything the admin product page needs. */
 const PRODUCT_DETAIL_INCLUDE = {
@@ -104,6 +105,7 @@ export class ProductsService {
     const created = await this.prisma.product.create({
       data: {
         ...core,
+        ...derivedPrices(core.originalPrice, core.discountPrice),
         slug: core.slug ?? slugify(core.name),
         publishedAt: core.status === 'PUBLISHED' ? new Date() : null,
         images: {
@@ -156,16 +158,19 @@ export class ProductsService {
 
   async update(id: string, dto: UpdateProductDto) {
     const current = await this.findOne(id);
-    this.assertPrices(
-      dto.originalPrice ?? current.originalPrice,
-      dto.discountPrice !== undefined ? dto.discountPrice : current.discountPrice,
-    );
+    const originalPrice = dto.originalPrice ?? current.originalPrice;
+    const discountPrice = dto.discountPrice !== undefined ? dto.discountPrice : current.discountPrice;
+    this.assertPrices(originalPrice, discountPrice);
     if (dto.categoryId && dto.categoryId !== current.categoryId) {
       await this.assertCategory(dto.categoryId);
     }
     await this.prisma.product.update({
       where: { id },
-      data: { ...dto, publishedAt: nextPublishedAt(dto.status, current.publishedAt) },
+      data: {
+        ...dto,
+        ...derivedPrices(originalPrice, discountPrice),
+        publishedAt: nextPublishedAt(dto.status, current.publishedAt),
+      },
     });
     return this.findOne(id);
   }
@@ -228,6 +233,7 @@ export class ProductsService {
       collectionName: dto.collectionName ?? null,
       originalPrice: dto.originalPrice,
       discountPrice: dto.discountPrice ?? null,
+      ...derivedPrices(dto.originalPrice, dto.discountPrice),
       hsnCode: dto.hsnCode ?? null,
       gstRate: dto.gstRate ?? 5,
       lengthCm: dto.lengthCm ?? null,

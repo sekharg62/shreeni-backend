@@ -1,5 +1,6 @@
 /**
- * Demo catalogue for testing the storefront: 40 published sarees across the 8 sub-categories,
+ * Demo catalogue for testing the storefront: 40 published sarees across the 8 sub-categories plus
+ * 64 extra Handloom sarees (one shared photo) for pagination,
  * each with Unsplash photos, a Free Size variant, specs, colour/tag links, 4 related products
  * and 10–15 approved reviews.
  *
@@ -12,6 +13,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { derivedPrices } from '../modules/products/derived-prices.js';
 
 const SKU_PREFIX = 'DEMO-';
 
@@ -133,7 +135,13 @@ const WEAVES: Record<string, Weave> = {
   },
 };
 
-type Item = { name: string; category: keyof typeof WEAVES; photo: Photo };
+type Item = {
+  name: string;
+  category: keyof typeof WEAVES;
+  photo: Photo;
+  /** Bulk items: only the main photo, their own copy, price range and colours. */
+  bulk?: { shortDescription: string; description: string; price: [number, number]; colors: [string, string] };
+};
 const PRODUCTS: Item[] = [
   { name: 'Crimson Baluchori Silk Saree', category: 'baluchori', photo: 'redGoldBridal' },
   { name: 'Royal Purple Baluchori Saree', category: 'baluchori', photo: 'purpleGold' },
@@ -189,6 +197,55 @@ const FEATURED = new Set([
 ]);
 /** Stock 0, to test the "Out of stock" states. */
 const SOLD_OUT = new Set(['Crimson Baluchori Silk Saree', 'Classic Red Border Tant Saree', 'Monochrome Kantha Stitch Saree']);
+
+/*
+ * 64 extra Handloom sarees (8 colours × 8 motifs) so one category spans several pages — for testing
+ * pagination. They all share one photo; names, copy, prices, colours and stock differ.
+ */
+const BULK_PHOTO: Photo = 'mint';
+const BULK_COLOURS: [label: string, palette: string, accent: string][] = [
+  ['Red', 'Red', 'White'], ['Maroon', 'Maroon', 'Gold'], ['Mustard', 'Mustard', 'Red'], ['Green', 'Green', 'Gold'],
+  ['Teal', 'Teal', 'White'], ['Navy', 'Navy', 'Gold'], ['Rose Pink', 'Pink', 'Green'], ['Ivory', 'Ivory', 'Red'],
+];
+const BULK_MOTIFS: [name: string, detail: string][] = [
+  ['Paisley', 'paisley (kalka) motifs woven across the body'],
+  ['Temple Border', 'a stepped temple border along both edges'],
+  ['Checked', 'small woven checks that give it a crisp, classic look'],
+  ['Striped', 'fine vertical stripes that drape beautifully'],
+  ['Butta', 'evenly spaced butta dots all over the body'],
+  ['Floral Vine', 'a delicate floral vine running along the border'],
+  ['Lotus Motif', 'lotus motifs on the pallu and border'],
+  ['Mango Motif', 'traditional mango (aam) motifs on the pallu'],
+];
+const BULK_OCCASIONS = ['everyday wear', 'office and daily wear', 'pujas and family functions', 'summer days', 'festive mornings'];
+const BULK_INTROS = [
+  'Woven on a traditional pit loom by weavers in Nadia,',
+  'Handwoven in small batches in Bengal,',
+  'Made on a hand-operated loom by village artisans,',
+  'Crafted by a weaving family in Phulia,',
+];
+const BULK_ITEMS: Item[] = BULK_COLOURS.flatMap(([label, palette, accent], c) =>
+  BULK_MOTIFS.map(([motif, detail], m): Item => {
+    const name = `${label} ${motif} Handloom Saree`;
+    const occasion = BULK_OCCASIONS[(c + m) % BULK_OCCASIONS.length];
+    const intro = BULK_INTROS[(c * 3 + m) % BULK_INTROS.length];
+    return {
+      name,
+      category: 'handloom',
+      photo: BULK_PHOTO,
+      bulk: {
+        shortDescription: `A soft ${label.toLowerCase()} handloom cotton saree with ${motif.toLowerCase()} detailing — easy to drape for ${occasion}.`,
+        description:
+          `${intro} this ${label.toLowerCase()} saree features ${detail}. ` +
+          `The breathable cotton keeps you comfortable all day, and the ${accent.toLowerCase()} accents add a quiet richness. ` +
+          `A versatile pick for ${occasion}.`,
+        price: [1499, 4999],
+        colors: [palette, accent],
+      },
+    };
+  }),
+);
+const ALL_ITEMS: Item[] = [...PRODUCTS, ...BULK_ITEMS];
 
 /* ───────────── Colours & tags ───────────── */
 /** Saree colour palette (matched by name, case-insensitive; existing colours are kept as they are). */
@@ -376,13 +433,16 @@ async function main() {
     const soldOut = SOLD_OUT;
     const created: { id: string; category: string }[] = [];
 
-    for (const [i, item] of PRODUCTS.entries()) {
+    for (const [i, item] of ALL_ITEMS.entries()) {
+      // Only the original second batch (items 20–39) is tagged "New Arrival".
+      const isNew = i >= 20 && i < PRODUCTS.length;
       seedFrom(item.name);
       const weave = WEAVES[item.category];
-      const original = price99(int(weave.price[0], weave.price[1]));
+      const priceRange = item.bulk?.price ?? weave.price;
+      const original = price99(int(priceRange[0], priceRange[1]));
       const onSale = rand() < 0.5;
       const sale = onSale ? price99(original * (1 - int(10, 25) / 100)) : null;
-      const extraPhotos = shuffle(ALL_PHOTOS.filter((p) => p !== item.photo)).slice(0, int(2, 3));
+      const extraPhotos = item.bulk ? [] : shuffle(ALL_PHOTOS.filter((p) => p !== item.photo)).slice(0, int(2, 3));
       const photos = [item.photo, ...extraPhotos];
       const slug = slugify(item.name);
 
@@ -390,8 +450,11 @@ async function main() {
         data: {
           name: item.name,
           slug,
-          shortDescription: `A ${weave.fabric.toLowerCase()} ${item.category.replace(/-/g, ' ')} saree, handpicked from weavers in Bengal.`,
+          shortDescription:
+            item.bulk?.shortDescription ??
+            `A ${weave.fabric.toLowerCase()} ${item.category.replace(/-/g, ' ')} saree, handpicked from weavers in Bengal.`,
           description:
+            item.bulk?.description ??
             `${item.name} is woven by artisans in Bengal using ${weave.fabric.toLowerCase()}. ` +
             `It comes with a coordinated border and pallu, drapes gracefully and is finished by hand. ` +
             `Perfect for festive occasions, family functions and gifting.`,
@@ -400,6 +463,7 @@ async function main() {
           fabric: weave.fabric,
           originalPrice: paise(original),
           discountPrice: sale ? paise(sale) : null,
+          ...derivedPrices(paise(original), sale ? paise(sale) : null),
           hsnCode: weave.hsn,
           gstRate: 5,
           lengthCm: 550,
@@ -413,7 +477,7 @@ async function main() {
           isFeatured: featured.has(item.name),
           sortOrder: i,
           // Second batch = "New Arrival": published in the last two weeks.
-          publishedAt: daysAgo(i >= 20 ? int(1, 14) : int(15, 60)),
+          publishedAt: daysAgo(isNew ? int(1, 14) : int(15, 60)),
           images: {
             create: photos.map((p, n) => ({ url: PHOTOS[p], sortOrder: n, isPrimary: n === 0 })),
           },
@@ -434,11 +498,11 @@ async function main() {
             ],
           },
           colors: {
-            create: (PRODUCT_COLORS[item.name] ?? [])
+            create: (item.bulk?.colors ?? PRODUCT_COLORS[item.name] ?? [])
               .filter((name): name is string => !!name)
               .map((name, n) => ({ colorId: colorId.get(name)!, colorType: n === 0 ? ('PRIMARY' as const) : ('SECONDARY' as const) })),
           },
-          tags: { create: tagsFor(item, i >= 20).map((slug) => ({ tagId: tagId.get(slug)! })) },
+          tags: { create: tagsFor(item, isNew).map((slug) => ({ tagId: tagId.get(slug)! })) },
         },
         select: { id: true },
       });
@@ -464,7 +528,7 @@ async function main() {
           };
         }),
       });
-      process.stdout.write(`\rCreated ${created.length} / ${PRODUCTS.length} products`);
+      process.stdout.write(`\rCreated ${created.length} / ${ALL_ITEMS.length} products`);
     }
 
     // 4 related products each: same category first, then others.

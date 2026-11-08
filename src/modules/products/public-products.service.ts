@@ -1,11 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { slugify } from '../../common/utils/catalog.js';
+import {
+  OFFER_LEVELS,
+  PRICE_BUCKETS,
+  filterConditions,
+  inStockWhere,
+  priceWhere,
+  sortOrder,
+  type FilterGroup,
+} from './product-filters.js';
 import { pageArgs, paginated } from '../../common/utils/pagination.js';
 import type {
+  ProductFacetsDto,
   PublicCrumbDto,
   PublicProductCardDto,
   PublicProductDetailDto,
   PublicProductPageDto,
+  PublicProductFiltersDto,
   PublicProductQueryDto,
 } from './dto/public-product.dto.js';
 
@@ -71,13 +84,13 @@ export function toCard(p: CardRow): PublicProductCardDto {
 export class PublicProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Products in a published category or any published sub-category, as cards. */
-  async findCards(q: PublicProductQueryDto): Promise<PublicProductPageDto> {
+  /** Published category + its published sub-categories, or 404. */
+  private async categoryIds(slug: string): Promise<string[]> {
     const root = await this.prisma.category.findFirst({
-      where: { slug: q.category, status: 'PUBLISHED' },
+      where: { slug, status: 'PUBLISHED' },
       select: { id: true },
     });
-    if (!root) throw new NotFoundException(`Category "${q.category}" not found`);
+    if (!root) throw new NotFoundException(`Category "${slug}" not found`);
 
     // Collect the published subtree (the category table is small).
     const published = await this.prisma.category.findMany({
@@ -88,18 +101,100 @@ export class PublicProductsService {
     for (let i = 0; i < categoryIds.length; i++) {
       for (const c of published) if (c.parentId === categoryIds[i]) categoryIds.push(c.id);
     }
+    return categoryIds;
+  }
 
-    const where = { status: 'PUBLISHED' as const, categoryId: { in: categoryIds } };
+  /** Colour slugs ("light-pink") → colour ids. The colour table is small. */
+  private async colorIds(slugs: string[] | undefined): Promise<string[] | undefined> {
+    if (!slugs?.length) return undefined;
+    const colors = await this.prisma.color.findMany({ select: { id: true, name: true } });
+    const wanted = new Set(slugs);
+    return colors.filter((c) => wanted.has(slugify(c.name))).map((c) => c.id);
+  }
+
+  /** Products in a published category or any published sub-category, filtered and sorted, as cards. */
+  async findCards(q: PublicProductQueryDto): Promise<PublicProductPageDto> {
+    const [categoryIds, colorIds] = await Promise.all([this.categoryIds(q.category), this.colorIds(q.colors)]);
+    const where: Prisma.ProductWhereInput = {
+      AND: [
+        { status: 'PUBLISHED', categoryId: { in: categoryIds } },
+        ...filterConditions(q, colorIds, this.prisma.productVariant.fields.reservedStock),
+      ],
+    };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where,
-        orderBy: CARD_ORDER,
+        orderBy: sortOrder(q.sort),
         select: CARD_SELECT,
         ...pageArgs(q.page, q.limit),
       }),
       this.prisma.product.count({ where }),
     ]);
     return paginated(rows.map(toCard), total, q.page, q.limit);
+  }
+
+  /**
+   * Filter options for a category with counts. Each group is counted with every OTHER selected
+   * filter applied ("disjunctive" facets), so options never lead to an empty page.
+   */
+  async facets(f: PublicProductFiltersDto): Promise<ProductFacetsDto> {
+    const [categoryIds, colorIds] = await Promise.all([this.categoryIds(f.category), this.colorIds(f.colors)]);
+    const reserved = this.prisma.productVariant.fields.reservedStock;
+    const base: Prisma.ProductWhereInput = { status: 'PUBLISHED', categoryId: { in: categoryIds } };
+    const where = (except?: FilterGroup, extra?: Prisma.ProductWhereInput): Prisma.ProductWhereInput => ({
+      AND: [base, ...filterConditions(f, colorIds, reserved, except), ...(extra ? [extra] : [])],
+    });
+
+    const [total, colorGroups, tagGroups, priceRange, inStockCount, ...counts] = await this.prisma.$transaction([
+      this.prisma.product.count({ where: where() }),
+      this.prisma.productColor.groupBy({
+        by: ['colorId'],
+        where: { colorType: 'PRIMARY', product: where('colors') },
+        _count: { _all: true },
+        orderBy: { colorId: 'asc' },
+      }),
+      this.prisma.productTag.groupBy({
+        by: ['tagId'],
+        where: { product: where('tags') },
+        _count: { _all: true },
+        orderBy: { tagId: 'asc' },
+      }),
+      this.prisma.product.aggregate({ where: where('price'), _min: { sellingPrice: true }, _max: { sellingPrice: true } }),
+      this.prisma.product.count({ where: where('stock', inStockWhere(reserved)) }),
+      ...PRICE_BUCKETS.map(([min, max]) => this.prisma.product.count({ where: where('price', priceWhere(min, max)) })),
+      ...OFFER_LEVELS.map((pct) => this.prisma.product.count({ where: where('offer', { discountPercent: { gte: pct } }) })),
+    ]);
+    const bucketCounts = counts.slice(0, PRICE_BUCKETS.length);
+    const offerCounts = counts.slice(PRICE_BUCKETS.length);
+
+    const [colors, tags] = await Promise.all([
+      this.prisma.color.findMany({
+        where: { id: { in: colorGroups.map((g) => g.colorId) } },
+        select: { id: true, name: true, hexCode: true },
+      }),
+      this.prisma.tag.findMany({
+        where: { id: { in: tagGroups.map((g) => g.tagId) } },
+        select: { id: true, name: true, slug: true, color: true },
+      }),
+    ]);
+    const countOf = (groups: { _count: unknown }[], i: number) => (groups[i]._count as { _all: number })._all;
+    const colorCount = new Map(colorGroups.map((g, i) => [g.colorId, countOf(colorGroups, i)]));
+    const tagCount = new Map(tagGroups.map((g, i) => [g.tagId, countOf(tagGroups, i)]));
+
+    return {
+      total,
+      colors: colors
+        .map((c) => ({ slug: slugify(c.name), name: c.name, hexCode: c.hexCode, count: colorCount.get(c.id) ?? 0 }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      tags: tags
+        .map((t) => ({ slug: t.slug, name: t.name, color: t.color, count: tagCount.get(t.id) ?? 0 }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      priceBuckets: PRICE_BUCKETS.map(([min, max], i) => ({ min, max, count: bucketCounts[i] })).filter((b) => b.count > 0),
+      minPrice: priceRange._min.sellingPrice,
+      maxPrice: priceRange._max.sellingPrice,
+      offers: OFFER_LEVELS.map((minDiscount, i) => ({ minDiscount, count: offerCounts[i] })).filter((o) => o.count > 0),
+      inStockCount,
+    };
   }
 
   /** Everything the product page shows above the related section. */

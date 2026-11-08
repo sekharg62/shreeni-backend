@@ -166,6 +166,11 @@ model Product {
   collectionName      String?
   originalPrice       Int // paise
   discountPrice       Int? // paise
+  /// What the customer pays (paise): discountPrice when it is lower, else originalPrice.
+  /// Stored (kept in sync on every write) so the storefront can filter and sort by price.
+  sellingPrice        Int
+  /// Whole-number % off originalPrice (0 when not on sale), for "Offers" filters and sorting.
+  discountPercent     Int           @default(0)
   hsnCode             String?
   gstRate             Int           @default(5) // percent
   lengthCm            Decimal?      @db.Decimal(7, 2)
@@ -200,6 +205,8 @@ model Product {
   @@index([categoryId])
   @@index([status])
   @@index([isFeatured])
+  @@index([categoryId, status, sellingPrice])
+  @@index([categoryId, status, discountPercent])
 }
 
 model ProductImage {
