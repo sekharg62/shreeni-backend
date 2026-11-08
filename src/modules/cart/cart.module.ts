@@ -6,5 +6,6 @@ import { PublicCartController } from './public-cart.controller.js';
 @Module({
   controllers: [CartController, PublicCartController],
   providers: [CartService],
+  exports: [CartService],
 })
 export class CartModule {}
