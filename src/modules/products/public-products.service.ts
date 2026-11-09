@@ -25,6 +25,9 @@ import type {
 /** Highest quantity the storefront is told about; exact stock stays private. */
 export const MAX_ORDERABLE = 10;
 
+/** At or below this many pieces left (all sizes together), a card says "Only N left". */
+export const FEW_LEFT_AT = 3;
+
 /** Columns a product card needs. */
 export const CARD_SELECT = {
   id: true,
@@ -32,11 +35,13 @@ export const CARD_SELECT = {
   slug: true,
   originalPrice: true,
   discountPrice: true,
+  // Main photo + the next one (shown on hover).
   images: {
     orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }],
-    take: 1,
+    take: 2,
     select: { url: true },
   },
+  category: { select: { name: true } },
   // Only what's needed to tell whether any size can be bought.
   variants: { where: { isActive: true }, select: { stock: true, reservedStock: true } },
 };
@@ -55,6 +60,8 @@ export type CardRow = {
   originalPrice: number;
   discountPrice: number | null;
   images: { url: string }[];
+  /** Optional so older callers/tests without it still work. */
+  category?: { name: string } | null;
   variants: { stock: number; reservedStock: number }[];
 };
 
@@ -68,14 +75,19 @@ export function pricing(originalPrice: number, discountPrice: number | null) {
 }
 
 export function toCard(p: CardRow): PublicProductCardDto {
+  const left = p.variants.reduce((sum, v) => sum + Math.max(0, v.stock - v.reservedStock), 0);
   return {
     id: p.id,
     name: p.name,
     slug: p.slug,
     ...pricing(p.originalPrice, p.discountPrice),
     imageUrl: p.images[0]?.url ?? null,
+    hoverImageUrl: p.images[1]?.url ?? null,
+    categoryName: p.category?.name ?? null,
     // Same rule as the product page: some active size has stock left after reservations.
-    inStock: p.variants.some((v) => v.stock - v.reservedStock > 0),
+    inStock: left > 0,
+    // Exact stock stays private: only small counts are shared, to say "Only 2 left".
+    fewLeft: left > 0 && left <= FEW_LEFT_AT ? left : null,
   };
 }
 

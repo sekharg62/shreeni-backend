@@ -27,6 +27,7 @@ import { CartModule } from './modules/cart/cart.module.js';
 import { PincodesModule } from './modules/pincodes/pincodes.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
 import { CustomersModule } from './modules/customers/customers.module.js';
+import { HomePicksModule } from './modules/home-picks/home-picks.module.js';
 import configuration from './config/configuration.js';
 import { validateEnv } from './config/env.validation.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
@@ -63,6 +64,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware.j
     PincodesModule,
     OrdersModule,
     CustomersModule,
+    HomePicksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

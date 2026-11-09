@@ -46,7 +46,18 @@ describe('WishlistService', () => {
         }),
       );
       expect(cards).toEqual([
-        { id: P1, name: 'Saree 3333', slug: 'saree-3333', price: 400000, compareAtPrice: 500000, imageUrl: `https://img/${P1}.jpg`, inStock: true },
+        {
+          id: P1,
+          name: 'Saree 3333',
+          slug: 'saree-3333',
+          price: 400000,
+          compareAtPrice: 500000,
+          imageUrl: `https://img/${P1}.jpg`,
+          hoverImageUrl: null,
+          categoryName: null,
+          inStock: true,
+          fewLeft: 2, // stock 3 − 1 reserved
+        },
       ]);
     });
   });

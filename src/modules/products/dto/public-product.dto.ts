@@ -114,8 +114,22 @@ export class PublicProductCardDto {
   @ApiProperty({ type: String, nullable: true, description: 'Main photo (or first by order)' })
   imageUrl!: string | null;
 
+  @ApiProperty({ type: String, nullable: true, description: 'Second photo, shown on hover; null when there is only one' })
+  hoverImageUrl!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Kantha Stitch' })
+  categoryName!: string | null;
+
   @ApiProperty({ description: 'false when every size is sold out' })
   inStock!: boolean;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 2,
+    description: 'Pieces left (all sizes) when 3 or fewer, for "Only 2 left"; otherwise null',
+  })
+  fewLeft!: number | null;
 }
 
 class PageMetaDto {
