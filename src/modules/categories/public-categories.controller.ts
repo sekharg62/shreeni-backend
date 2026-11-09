@@ -4,7 +4,7 @@ import { CategoriesService } from './categories.service.js';
 import {
   CategoryChildrenQueryDto,
   CategorySlugParamDto,
-  PublicCategoryCardDto,
+  PublicCategoryCardPageDto,
   PublicCategoryDetailDto,
 } from './dto/public-category.dto.js';
 
@@ -14,13 +14,13 @@ import {
 export class PublicCategoriesController {
   constructor(private readonly categories: CategoriesService) {}
 
-  /** Published direct children of a category, in admin order. */
+  /** Published direct children of a category, in admin order, one page at a time (default 10). */
   @Get('children')
   @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
-  @ApiOkResponse({ type: PublicCategoryCardDto, isArray: true })
+  @ApiOkResponse({ type: PublicCategoryCardPageDto })
   @ApiNotFoundResponse({ description: 'No category with that slug' })
-  children(@Query() q: CategoryChildrenQueryDto): Promise<PublicCategoryCardDto[]> {
-    return this.categories.findPublishedChildren(q.slug);
+  children(@Query() q: CategoryChildrenQueryDto): Promise<PublicCategoryCardPageDto> {
+    return this.categories.findPublishedChildren(q.slug, q.page, q.limit);
   }
 
   /** One published category (page header + breadcrumb). Declared after 'children'. */

@@ -1,14 +1,30 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Matches, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Matches, Max, Min, MaxLength } from 'class-validator';
 import { SLUG_MESSAGE, SLUG_REGEX } from '../../../common/utils/validation.js';
 
-/** `GET /categories/children?slug=saree` */
+/** `GET /categories/children?slug=saree&page=1&limit=10` */
 export class CategoryChildrenQueryDto {
   @ApiProperty({ example: 'saree', description: 'Slug of the parent category' })
   @IsString()
   @MaxLength(120)
   @Matches(SLUG_REGEX, { message: SLUG_MESSAGE })
   slug!: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1, description: 'Page number, starting at 1' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page: number = 1;
+
+  @ApiPropertyOptional({ example: 10, default: 10, maximum: 50, description: 'Cards per page' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit: number = 10;
 }
 
 /** One sub-category card on the storefront — display fields only. */
@@ -30,6 +46,22 @@ export class PublicCategoryCardDto {
 
   @ApiProperty({ description: 'Biggest % off right now (0 = nothing on sale)' })
   maxDiscountPercent!: number;
+}
+
+export class PageMetaDto {
+  @ApiProperty({ example: 1 }) page!: number;
+  @ApiProperty({ example: 10 }) limit!: number;
+  @ApiProperty({ example: 14 }) total!: number;
+  @ApiProperty({ example: 2 }) totalPages!: number;
+}
+
+/** `GET /categories/children` response: one page of cards + paging info. */
+export class PublicCategoryCardPageDto {
+  @ApiProperty({ type: PublicCategoryCardDto, isArray: true })
+  data!: PublicCategoryCardDto[];
+
+  @ApiProperty({ type: PageMetaDto })
+  meta!: PageMetaDto;
 }
 
 /** `GET /categories/:slug` */

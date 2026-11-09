@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CatalogStatus, Gender } from '../../generated/prisma/enums.js';
 import { nextPublishedAt, reorderUpdates, slugify } from '../../common/utils/catalog.js';
-import { pageArgs, paginated } from '../../common/utils/pagination.js';
+import { pageArgs, paginated, type Paginated } from '../../common/utils/pagination.js';
 import { S3StorageService } from '../s3-img-uploader/s3-storage.service.js';
 import { ImageUploadService } from '../s3-img-uploader/image-upload.service.js';
 import { ImagePaths, MAX_WIDTH } from '../s3-img-uploader/image-paths.js';
@@ -119,33 +119,39 @@ export class CategoriesService {
   }
 
   /**
-   * Storefront: published direct children of the category with this slug, with card stats
-   * (starting price, best discount) over each child and its published sub-categories.
-   * Two queries. 404 when the slug doesn't exist.
+   * Storefront: one page of the published direct children of the category with this slug,
+   * with card stats (starting price, best discount) over each child and its published
+   * sub-categories. Stats are worked out for the cards on this page only. 404 when the slug doesn't exist.
    */
-  async findPublishedChildren(slug: string): Promise<PublicCategoryCardDto[]> {
-    const parent = await this.prisma.category.findUnique({
-      where: { slug },
-      select: {
-        children: {
-          where: { status: 'PUBLISHED' },
-          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            posterUrl: true,
-            tagline: true,
-            children: { where: { status: 'PUBLISHED' }, select: { id: true } },
-          },
+  async findPublishedChildren(
+    slug: string,
+    page = 1,
+    limit = 10,
+  ): Promise<Paginated<PublicCategoryCardDto>> {
+    const parentRow = await this.prisma.category.findUnique({ where: { slug }, select: { id: true } });
+    if (!parentRow) throw new NotFoundException(`Category "${slug}" not found`);
+
+    const where = { parentId: parentRow.id, status: 'PUBLISHED' as const };
+    const [children, total] = await this.prisma.$transaction([
+      this.prisma.category.findMany({
+        where,
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          posterUrl: true,
+          tagline: true,
+          children: { where: { status: 'PUBLISHED' }, select: { id: true } },
         },
-      },
-    });
-    if (!parent) throw new NotFoundException(`Category "${slug}" not found`);
+        ...pageArgs(page, limit),
+      }),
+      this.prisma.category.count({ where }),
+    ]);
 
     // Products filed under a sub-category count towards its parent card.
     const cardOf = new Map<string, string>();
-    for (const c of parent.children) {
+    for (const c of children) {
       cardOf.set(c.id, c.id);
       for (const sub of c.children) cardOf.set(sub.id, c.id);
     }
@@ -169,10 +175,11 @@ export class CategoriesService {
       stats.set(id, s);
     }
 
-    return parent.children.map(({ id, children: _subs, ...c }) => ({
+    const cards = children.map(({ id, children: _subs, ...c }) => ({
       ...c,
       ...(stats.get(id) ?? { minPrice: null, maxDiscountPercent: 0 }),
     }));
+    return paginated(cards, total, page, limit);
   }
 
   /** Storefront: a published category's header fields + its parent chain for the breadcrumb. */
