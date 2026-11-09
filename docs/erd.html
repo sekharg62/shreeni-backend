@@ -73,7 +73,7 @@
   <body>
     <div id="toolbar">
       <h1>Shreeni — ERD</h1>
-      <span class="hint">drag a table's header to move · drag empty space to pan · scroll to zoom</span>
+      <span class="hint">drag a table's header to move · drag empty space to pan · scroll to zoom · <b>?</b> = nullable · createdAt/updatedAt omitted</span>
       <span class="spacer"></span>
       <button onclick="zoomBy(1.1)">Zoom +</button>
       <button onclick="zoomBy(0.9)">Zoom −</button>
@@ -90,32 +90,39 @@
     <script>
       // ---- Schema data -----------------------------------------------------
       // f: [name, type, key]  key = 'PK' | 'FK' | ''
+      // Types ending in '?' are nullable. createdAt / updatedAt are omitted (every table has them).
       const TABLES = {
-        Category: [['id','uuid','PK'],['name','string',''],['slug','string',''],['parentId','uuid','FK'],['gender','enum',''],['bannerUrl','string',''],['posterUrl','string',''],['sortOrder','int',''],['status','enum','']],
-        Collection: [['id','uuid','PK'],['name','string',''],['slug','string',''],['isActive','bool','']],
-        Product: [['id','uuid','PK'],['name','string',''],['slug','string',''],['categoryId','uuid','FK'],['gender','enum',''],['fabric','string',''],['originalPrice','paise',''],['discountPrice','paise',''],['hsnCode','string',''],['gstRate','int',''],['status','enum',''],['isFeatured','bool','']],
+        Category: [['id','uuid','PK'],['name','string',''],['slug','string',''],['description','string?',''],['tagline','varchar(80)?',''],['parentId','uuid?','FK'],['gender','Gender?',''],['bannerUrl','string?',''],['posterUrl','string?',''],['sortOrder','int',''],['status','CatalogStatus',''],['publishedAt','datetime?','']],
+        Collection: [['id','uuid','PK'],['name','string',''],['slug','string',''],['description','string?',''],['isActive','bool','']],
+        Product: [['id','uuid','PK'],['name','string',''],['slug','string',''],['shortDescription','string?',''],['description','string',''],['story','string?',''],['categoryId','uuid','FK'],['gender','Gender',''],['fabric','string?',''],['collectionName','string?',''],['originalPrice','paise',''],['discountPrice','paise?',''],['sellingPrice','paise',''],['discountPercent','int',''],['hsnCode','string?',''],['gstRate','int',''],['lengthCm','decimal?',''],['widthCm','decimal?',''],['blousePiece','bool',''],['blousePieceInfo','string?',''],['washCare','string?',''],['countryOfOrigin','string?',''],['manufacturedBy','string?',''],['manufacturerAddress','string?',''],['status','CatalogStatus',''],['isFeatured','bool',''],['sortOrder','int',''],['publishedAt','datetime?','']],
         ProductImage: [['id','uuid','PK'],['productId','uuid','FK'],['url','string',''],['sortOrder','int',''],['isPrimary','bool','']],
-        ProductVariant: [['id','uuid','PK'],['productId','uuid','FK'],['size','string',''],['sku','string',''],['stock','int',''],['reservedStock','int',''],['priceOverride','paise','']],
-        ProductSpecification: [['id','uuid','PK'],['productId','uuid','FK'],['group','enum',''],['label','string',''],['value','string',''],['sortOrder','int','']],
-        Tag: [['id','uuid','PK'],['name','string',''],['slug','string',''],['color','string','']],
-        Color: [['id','uuid','PK'],['name','string',''],['hexCode','string','']],
-        ProductColor: [['id','uuid','PK'],['productId','uuid','FK'],['colorId','uuid','FK'],['colorType','enum','']],
+        ProductVariant: [['id','uuid','PK'],['productId','uuid','FK'],['size','string',''],['sku','string',''],['stock','int',''],['reservedStock','int',''],['priceOverride','paise?',''],['isActive','bool','']],
+        ProductSpecification: [['id','uuid','PK'],['productId','uuid','FK'],['group','SpecGroup',''],['label','string',''],['value','string',''],['sortOrder','int','']],
+        Tag: [['id','uuid','PK'],['name','string',''],['slug','string',''],['color','string?','']],
+        Color: [['id','uuid','PK'],['name','string',''],['hexCode','string?','']],
+        ProductColor: [['id','uuid','PK'],['productId','uuid','FK'],['colorId','uuid','FK'],['colorType','ColorType','']],
         ProductTag: [['id','uuid','PK'],['productId','uuid','FK'],['tagId','uuid','FK']],
         ProductCollection: [['id','uuid','PK'],['productId','uuid','FK'],['collectionId','uuid','FK']],
         RelatedProduct: [['id','uuid','PK'],['productId','uuid','FK'],['relatedProductId','uuid','FK']],
-        Review: [['id','uuid','PK'],['productId','uuid','FK'],['userId','uuid','FK'],['rating','int',''],['title','string',''],['body','string',''],['reviewerEmail','string',''],['images','string[]',''],['videos','string[]',''],['status','enum','']],
-        User: [['id','uuid','PK'],['firstName','string',''],['lastName','string',''],['phone','string',''],['email','string',''],['passwordHash','string',''],['role','enum',''],['phoneVerified','bool',''],['emailVerified','bool','']],
-        Address: [['id','uuid','PK'],['userId','uuid','FK'],['label','enum',''],['receiverName','string',''],['receiverPhone','string',''],['flatHouseNo','string',''],['apartmentSector','string',''],['city','string',''],['state','string',''],['pincode','string',''],['isDefault','bool','']],
-        Cart: [['id','uuid','PK'],['userId','uuid','FK'],['sessionId','string','']],
+        Review: [['id','uuid','PK'],['productId','uuid','FK'],['userId','uuid?','FK'],['rating','int',''],['title','string',''],['body','string',''],['reviewerName','string',''],['reviewerEmail','string',''],['images','string[]',''],['videos','string[]',''],['status','ReviewStatus','']],
+        User: [['id','uuid','PK'],['firstName','string?',''],['lastName','string?',''],['phone','string',''],['email','string?',''],['passwordHash','string?',''],['role','Role',''],['phoneVerified','bool',''],['emailVerified','bool','']],
+        Address: [['id','uuid','PK'],['userId','uuid','FK'],['label','AddressLabel',''],['receiverName','string',''],['receiverPhone','string',''],['flatHouseNo','string',''],['apartmentSector','string?',''],['landmark','string?',''],['city','string',''],['state','string',''],['pincode','string',''],['country','string',''],['isDefault','bool','']],
+        Cart: [['id','uuid','PK'],['userId','uuid?','FK'],['sessionId','string?','']],
         CartItem: [['id','uuid','PK'],['cartId','uuid','FK'],['productId','uuid','FK'],['variantId','uuid','FK'],['quantity','int','']],
         Wishlist: [['id','uuid','PK'],['userId','uuid','FK']],
         WishlistItem: [['id','uuid','PK'],['wishlistId','uuid','FK'],['productId','uuid','FK']],
-        Order: [['id','uuid','PK'],['orderNumber','string',''],['invoiceNumber','string',''],['userId','uuid','FK'],['contactEmail','string',''],['contactPhone','string',''],['discountId','uuid','FK'],['discountTotal','paise',''],['status','enum',''],['subtotal','paise',''],['grandTotal','paise',''],['shipReceiverName','string',''],['shipPincode','string','']],
-        OrderItem: [['id','uuid','PK'],['orderId','uuid','FK'],['productId','uuid','FK'],['variantId','uuid','FK'],['name','string',''],['unitPrice','paise',''],['quantity','int','']],
-        Payment: [['id','uuid','PK'],['orderId','uuid','FK'],['provider','string',''],['method','enum',''],['amount','paise',''],['status','enum','']],
-        Discount: [['id','uuid','PK'],['code','string',''],['type','enum',''],['value','int',''],['maxDiscountAmount','paise',''],['minOrderValue','paise',''],['usageLimit','int',''],['usedCount','int',''],['perUserLimit','int',''],['startsAt','datetime',''],['endsAt','datetime',''],['isActive','bool','']],
-        Banner: [['id','uuid','PK'],['title','string',''],['imageUrl','string',''],['mobileImageUrl','string',''],['linkUrl','string',''],['sortOrder','int',''],['status','enum','']],
-        Shipment: [['id','uuid','PK'],['orderId','uuid','FK'],['deliveryPartner','string',''],['awb','string',''],['status','enum','']],
+        Order: [['id','uuid','PK'],['orderNumber','string',''],['invoiceNumber','string?',''],['userId','uuid?','FK'],['contactEmail','string?',''],['contactPhone','string',''],['status','OrderStatus',''],['subtotal','paise',''],['discountId','uuid?','FK'],['discountCode','string?',''],['discountTotal','paise',''],['shippingTotal','paise',''],['taxTotal','paise',''],['grandTotal','paise',''],['shipReceiverName','string',''],['shipReceiverPhone','string',''],['shipFlatHouseNo','string',''],['shipApartmentSector','string?',''],['shipLandmark','string?',''],['shipCity','string',''],['shipState','string',''],['shipPincode','string',''],['shipCountry','string',''],['idempotencyKey','string?',''],['cancelledAt','datetime?',''],['cancelReason','string?','']],
+        OrderEvent: [['id','uuid','PK'],['orderId','uuid','FK'],['status','OrderStatus',''],['note','string?',''],['actorId','uuid?','FK']],
+        OrderItem: [['id','uuid','PK'],['orderId','uuid','FK'],['productId','uuid?','FK'],['variantId','uuid?','FK'],['name','string',''],['sku','string?',''],['size','string?',''],['image','string?',''],['unitPrice','paise',''],['quantity','int','']],
+        Payment: [['id','uuid','PK'],['orderId','uuid','FK'],['provider','string',''],['method','PaymentMethod',''],['amount','paise',''],['status','PaymentStatus',''],['gatewayOrderId','string?',''],['gatewayTxnId','string?',''],['paidAt','datetime?','']],
+        Discount: [['id','uuid','PK'],['code','string',''],['description','string?',''],['type','DiscountType',''],['value','int',''],['maxDiscountAmount','paise?',''],['minOrderValue','paise?',''],['usageLimit','int?',''],['usedCount','int',''],['perUserLimit','int?',''],['startsAt','datetime?',''],['endsAt','datetime?',''],['isActive','bool','']],
+        Banner: [['id','uuid','PK'],['title','string?',''],['subtitle','string?',''],['imageUrl','string',''],['mobileImageUrl','string?',''],['linkUrl','string?',''],['sortOrder','int',''],['status','CatalogStatus','']],
+        Shipment: [['id','uuid','PK'],['orderId','uuid','FK'],['deliveryPartner','string',''],['awb','string?',''],['status','ShipmentStatus',''],['shippedAt','datetime?',''],['deliveredAt','datetime?','']],
+        SupportTicket: [['id','uuid','PK'],['ticketNumber','int (auto)',''],['userId','uuid','FK'],['reason','SupportReason',''],['description','text',''],['status','SupportStatus',''],['lastMessageAt','datetime',''],['closedAt','datetime?','']],
+        SupportMessage: [['id','uuid','PK'],['ticketId','uuid','FK'],['senderId','uuid','FK'],['senderRole','Role',''],['body','text','']],
+        State: [['id','uuid','PK'],['name','string','']],
+        District: [['id','uuid','PK'],['name','string',''],['stateId','uuid','FK']],
+        Pincode: [['id','uuid','PK'],['pincode','string',''],['stateId','uuid','FK'],['districtId','uuid?','FK']],
       };
 
       // [from, to]
@@ -131,6 +138,9 @@
         ['User','Wishlist'],['Wishlist','WishlistItem'],['Product','WishlistItem'],
         ['User','Order'],['Order','OrderItem'],['Product','OrderItem'],['ProductVariant','OrderItem'],
         ['Discount','Order'],['Order','Payment'],['Order','Shipment'],
+        ['Order','OrderEvent'],['User','OrderEvent'],
+        ['User','SupportTicket'],['SupportTicket','SupportMessage'],['User','SupportMessage'],
+        ['State','District'],['State','Pincode'],['District','Pincode'],
       ];
 
       const ENUMS = {
@@ -146,17 +156,21 @@
         PaymentMethod: ['PREPAID','COD'],
         PaymentStatus: ['CREATED','PAID','FAILED','REFUNDED'],
         ShipmentStatus: ['PENDING','SHIPPED','IN_TRANSIT','DELIVERED','RETURNED','CANCELLED'],
+        SupportReason: ['ORDER_ISSUE','PAYMENT','DELIVERY','RETURN_REFUND','PRODUCT_QUALITY','ACCOUNT','OTHER'],
+        SupportStatus: ['OPEN','IN_PROGRESS','RESOLVED','CLOSED'],
       };
 
       // Rough column groups for the initial layout. Enums sit on the far left.
       const COLUMNS = [
         ['Enums'],
+        ['State','District','Pincode','Banner'],
         ['User','Address','Cart','Wishlist'],
-        ['Category','Collection','Tag','Color','Banner'],
+        ['Category','Collection','Tag','Color'],
         ['Product','ProductImage','ProductVariant','ProductSpecification'],
         ['ProductColor','ProductTag','ProductCollection','RelatedProduct','Review'],
-        ['CartItem','WishlistItem','Discount'],
-        ['Order','OrderItem','Payment','Shipment'],
+        ['CartItem','WishlistItem','Discount','SupportTicket','SupportMessage'],
+        ['Order','OrderEvent'],
+        ['OrderItem','Payment','Shipment'],
       ];
 
       // ---- Render ----------------------------------------------------------
