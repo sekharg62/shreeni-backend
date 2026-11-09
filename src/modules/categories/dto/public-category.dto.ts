@@ -21,6 +21,15 @@ export class PublicCategoryCardDto {
 
   @ApiProperty({ type: String, nullable: true, description: 'Portrait card image (≈3:4)' })
   posterUrl!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Mythology woven in silk' })
+  tagline!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true, description: 'Lowest selling price in paise (null when empty)' })
+  minPrice!: number | null;
+
+  @ApiProperty({ description: 'Biggest % off right now (0 = nothing on sale)' })
+  maxDiscountPercent!: number;
 }
 
 /** `GET /categories/:slug` */

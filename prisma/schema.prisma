@@ -123,6 +123,8 @@ model Category {
   name        String
   slug        String        @unique
   description String?
+  /// One short line for the storefront category card, e.g. "Mythology woven in silk".
+  tagline     String?       @db.VarChar(80)
   parentId    String?       @db.Uuid
   gender      Gender?
   bannerUrl   String?

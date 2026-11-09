@@ -13,7 +13,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { CatalogStatus, Gender } from '../../../generated/prisma/enums.js';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto.js';
 import { SLUG_MESSAGE, SLUG_REGEX } from '../../../common/utils/validation.js';
@@ -35,6 +35,13 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  /** One short line on the storefront card. Empty clears it. */
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() || null : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  tagline?: string | null;
 
   /** Parent category id; omit (or null) for a top-level category. */
   @IsOptional()

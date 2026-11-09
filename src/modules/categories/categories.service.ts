@@ -119,8 +119,9 @@ export class CategoriesService {
   }
 
   /**
-   * Storefront: published direct children of the category with this slug.
-   * One query, three columns per child. 404 when the slug doesn't exist.
+   * Storefront: published direct children of the category with this slug, with card stats
+   * (starting price, best discount) over each child and its published sub-categories.
+   * Two queries. 404 when the slug doesn't exist.
    */
   async findPublishedChildren(slug: string): Promise<PublicCategoryCardDto[]> {
     const parent = await this.prisma.category.findUnique({
@@ -129,12 +130,49 @@ export class CategoriesService {
         children: {
           where: { status: 'PUBLISHED' },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-          select: { name: true, slug: true, posterUrl: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            posterUrl: true,
+            tagline: true,
+            children: { where: { status: 'PUBLISHED' }, select: { id: true } },
+          },
         },
       },
     });
     if (!parent) throw new NotFoundException(`Category "${slug}" not found`);
-    return parent.children;
+
+    // Products filed under a sub-category count towards its parent card.
+    const cardOf = new Map<string, string>();
+    for (const c of parent.children) {
+      cardOf.set(c.id, c.id);
+      for (const sub of c.children) cardOf.set(sub.id, c.id);
+    }
+    const groups = cardOf.size
+      ? await this.prisma.product.groupBy({
+          by: ['categoryId'],
+          where: { status: 'PUBLISHED', categoryId: { in: [...cardOf.keys()] } },
+          orderBy: { categoryId: 'asc' },
+          _min: { sellingPrice: true },
+          _max: { discountPercent: true },
+        })
+      : [];
+
+    const stats = new Map<string, { minPrice: number | null; maxDiscountPercent: number }>();
+    for (const g of groups) {
+      const id = cardOf.get(g.categoryId)!;
+      const s = stats.get(id) ?? { minPrice: null, maxDiscountPercent: 0 };
+      const min = g._min?.sellingPrice ?? null;
+      if (min !== null) s.minPrice = s.minPrice === null ? min : Math.min(s.minPrice, min);
+      s.maxDiscountPercent = Math.max(s.maxDiscountPercent, g._max?.discountPercent ?? 0);
+      stats.set(id, s);
+    }
+
+    return parent.children.map(({ id, children: _subs, ...c }) => ({
+      ...c,
+      ...(stats.get(id) ?? { minPrice: null, maxDiscountPercent: 0 }),
+    }));
   }
 
   /** Storefront: a published category's header fields + its parent chain for the breadcrumb. */
@@ -214,6 +252,7 @@ export class CategoriesService {
         name: dto.name,
         slug: dto.slug ?? slugify(dto.name),
         description: dto.description ?? null,
+        tagline: dto.tagline ?? null,
         parentId: dto.parentId ?? null,
         gender: dto.gender ?? null,
         bannerUrl: dto.bannerUrl ?? null,
