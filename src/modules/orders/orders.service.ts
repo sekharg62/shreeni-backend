@@ -8,7 +8,9 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import type { OrderStatus } from '../../generated/prisma/enums.js';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { INVOICEABLE_STATUSES, assignInvoiceNumber, invoicePrefix } from '../invoices/invoice-number.js';
 import type { AuthUser } from '../../common/authz/auth-user.js';
 import { pageArgs, paginated } from '../../common/utils/pagination.js';
 import { normalizeIndianPhone } from '../auth/phone.js';
@@ -46,6 +48,7 @@ const ITEM_SELECT = {
 export const ORDER_DETAIL_SELECT = {
   id: true,
   orderNumber: true,
+  invoiceNumber: true,
   userId: true,
   status: true,
   createdAt: true,
@@ -103,6 +106,8 @@ const VARIANT_SELECT = {
       status: true,
       originalPrice: true,
       discountPrice: true,
+      hsnCode: true,
+      gstRate: true,
       images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }], take: 1, select: { url: true } },
     },
   },
@@ -168,6 +173,9 @@ export function toOrderDetail(o: DetailRow): OrderDetailDto {
     cancelledAt: o.cancelledAt,
     cancelReason: o.cancelReason,
     canCancel: CUSTOMER_CANCELLABLE.includes(o.status),
+    invoiceNumber: o.invoiceNumber,
+    // Confirmed orders (and cancelled/returned ones that were already invoiced) have an invoice.
+    hasInvoice: o.invoiceNumber !== null || (INVOICEABLE_STATUSES as readonly string[]).includes(o.status),
   };
 }
 
@@ -210,11 +218,17 @@ type Transition = {
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
+  /** Invoice series prefix, e.g. "SHR" → SHR/26-27/0001. */
+  private readonly invoicePrefix: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cart: CartService,
     private readonly pincodes: PincodesService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.invoicePrefix = invoicePrefix(config.get<string>('invoice.prefix') ?? 'SHR');
+  }
 
   /* ───────────── Checkout ───────────── */
 
@@ -317,6 +331,8 @@ export class OrdersService {
                   image: l.image,
                   unitPrice: l.unitPrice,
                   quantity: l.quantity,
+                  hsnCode: l.hsnCode,
+                  gstRate: l.gstRate,
                 })),
               },
               payments: {
@@ -370,6 +386,8 @@ export class OrdersService {
         data: { status: 'PAID', paidAt: new Date(), ...(gatewayTxnId && { gatewayTxnId }) },
       });
       await tx.orderEvent.create({ data: { orderId, status: 'CONFIRMED', note, actorId } });
+      // Same transaction: the invoice number is only used up if the confirmation sticks.
+      await assignInvoiceNumber(tx, orderId, new Date(), this.invoicePrefix);
     }, TX_OPTIONS);
   }
 
@@ -456,6 +474,7 @@ export class OrdersService {
       if (from === 'PENDING' && to === 'CONFIRMED') {
         await this.takeReservedStock(tx, orderId);
         await tx.payment.updateMany({ where: { orderId, status: { in: ['CREATED', 'FAILED'] } }, data: { status: 'PAID', paidAt: now } });
+        await assignInvoiceNumber(tx, orderId, now, this.invoicePrefix);
       }
 
       const effect = stockEffect(from, to);
@@ -590,6 +609,8 @@ export class OrdersService {
         sku: v.sku,
         image: v.product.images[0]?.url ?? null,
         unitPrice: pricing(v.product.originalPrice, v.priceOverride ?? v.product.discountPrice).price,
+        hsnCode: v.product.hsnCode,
+        gstRate: v.product.gstRate,
       };
     });
   }

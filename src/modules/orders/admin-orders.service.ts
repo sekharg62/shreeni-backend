@@ -6,6 +6,7 @@ import { pageArgs, paginated } from '../../common/utils/pagination.js';
 import type { AdminOrderStatusDto, AdminOrdersQueryDto } from './dto/order.dto.js';
 import { NEXT_STATUSES, STATUS_LABEL } from './order-status.js';
 import { OrdersService } from './orders.service.js';
+import { INVOICEABLE_STATUSES } from '../invoices/invoice-number.js';
 
 const LIST_SELECT = {
   id: true,
@@ -27,6 +28,8 @@ const LIST_SELECT = {
 const DETAIL_SELECT = {
   id: true,
   orderNumber: true,
+  invoiceNumber: true,
+  invoicedAt: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -141,6 +144,8 @@ export class AdminOrdersService {
       events: row.events.map((e) => ({ ...e, label: STATUS_LABEL[e.status] })),
       /** Statuses the admin can move this order to next. */
       nextStatuses: NEXT_STATUSES[row.status],
+      /** Confirmed (or already invoiced) orders have a downloadable invoice. */
+      hasInvoice: row.invoiceNumber !== null || (INVOICEABLE_STATUSES as readonly string[]).includes(row.status),
     };
   }
 

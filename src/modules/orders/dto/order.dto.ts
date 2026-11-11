@@ -269,6 +269,12 @@ export class OrderDetailDto {
   @ApiProperty({ type: String, nullable: true }) cancelReason!: string | null;
   /** The customer can cancel it themselves right now. */
   @ApiProperty() canCancel!: boolean;
+
+  @ApiProperty({ type: String, nullable: true, example: 'SHR/26-27/0001' })
+  invoiceNumber!: string | null;
+
+  @ApiProperty({ description: 'An invoice can be downloaded (the order was confirmed)' })
+  hasInvoice!: boolean;
 }
 
 export class OrderPageDto {

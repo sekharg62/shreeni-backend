@@ -28,6 +28,7 @@ import { PincodesModule } from './modules/pincodes/pincodes.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
 import { CustomersModule } from './modules/customers/customers.module.js';
 import { HomePicksModule } from './modules/home-picks/home-picks.module.js';
+import { InvoicesModule } from './modules/invoices/invoices.module.js';
 import configuration from './config/configuration.js';
 import { validateEnv } from './config/env.validation.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
@@ -65,6 +66,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware.j
     OrdersModule,
     CustomersModule,
     HomePicksModule,
+    InvoicesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
