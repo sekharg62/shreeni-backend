@@ -9,6 +9,10 @@ import { buildInvoiceLines, GSTIN_PATTERN, stateCode, stateName } from './gst.js
 import type { InvoiceDocument } from './invoice-document.js';
 import { INVOICEABLE_STATUSES, InvoiceNumberRace, assignInvoiceNumber, invoicePrefix } from './invoice-number.js';
 import { renderInvoicePdf } from './invoice-pdf.js';
+import { renderShippingLabelsPdf, type ShippingLabel } from './shipping-label-pdf.js';
+
+/** Most labels in one download (25 A4 pages). */
+export const MAX_LABELS = 100;
 
 /** When a product (or its rate) is gone, invoices use the shop's usual saree rate. */
 const DEFAULT_GST_RATE = 5;
@@ -113,6 +117,69 @@ export class InvoicesService {
   /** Admin: any order. */
   forAdmin(orderId: string): Promise<InvoiceFile> {
     return this.file(orderId);
+  }
+
+  /**
+   * Admin: printable shipping labels (4 per A4 page) for these orders, oldest first.
+   * Cash-on-delivery orders not yet paid show the amount the courier must collect.
+   */
+  async shippingLabels(orderIds: string[]): Promise<InvoiceFile> {
+    const rows = await this.prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        orderNumber: true,
+        invoiceNumber: true,
+        createdAt: true,
+        grandTotal: true,
+        shipReceiverName: true,
+        shipReceiverPhone: true,
+        shipFlatHouseNo: true,
+        shipApartmentSector: true,
+        shipLandmark: true,
+        shipCity: true,
+        shipState: true,
+        shipPincode: true,
+        items: { select: { quantity: true } },
+        payments: { orderBy: { createdAt: 'desc' }, take: 1, select: { method: true, status: true } },
+        shipment: { select: { deliveryPartner: true, awb: true } },
+      },
+    });
+    if (rows.length === 0) throw new NotFoundException('None of the selected orders were found');
+
+    const labels: ShippingLabel[] = rows.map((o) => {
+      const pay = o.payments[0];
+      const codDue = pay?.method === 'COD' && pay.status !== 'PAID';
+      return {
+        orderNumber: o.orderNumber,
+        orderDate: o.createdAt,
+        itemCount: o.items.reduce((n, i) => n + i.quantity, 0),
+        invoiceNumber: o.invoiceNumber,
+        to: {
+          name: o.shipReceiverName,
+          addressLines: [
+            [o.shipFlatHouseNo, o.shipApartmentSector].filter(Boolean).join(', '),
+            o.shipLandmark ? `Near ${o.shipLandmark}` : '',
+          ].filter(Boolean),
+          cityState: `${o.shipCity}, ${o.shipState}`,
+          pincode: o.shipPincode,
+          phone: o.shipReceiverPhone,
+        },
+        codAmount: codDue ? o.grandTotal : null,
+        courier: o.shipment?.deliveryPartner ?? null,
+        awb: o.shipment?.awb ?? null,
+      };
+    });
+
+    const s = this.seller;
+    const pdf = await renderShippingLabelsPdf(labels, {
+      brandName: s.brandName,
+      legalName: s.legalName,
+      addressLines: [...s.address.split(/\||\n/).map((l) => l.trim()).filter(Boolean), s.state],
+      phone: s.phone,
+    });
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()); // YYYY-MM-DD
+    return { filename: `${s.brandName}-Shipping-Labels-${day}.pdf`, pdf };
   }
 
   private async file(orderId: string): Promise<InvoiceFile> {

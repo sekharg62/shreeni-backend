@@ -9,6 +9,10 @@
         "include": "**/*.json",
         "exclude": "**/*.spec.json",
         "watchAssets": true
+      },
+      {
+        "include": "**/*.png",
+        "watchAssets": true
       }
     ],
     "plugins": [

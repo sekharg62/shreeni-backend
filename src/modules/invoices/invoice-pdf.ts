@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { amountInWords } from './gst.js';
 import type { InvoiceDocument } from './invoice-document.js';
+import { logoImage } from './pdf-assets.js';
 
 /*
  * Draws an InvoiceDocument as an A4 PDF. Built-in PDF fonts only (Helvetica / Times), so nothing has to
@@ -18,6 +19,8 @@ const C = {
 };
 
 const PAGE = { width: 595.28, height: 841.89, margin: 40 };
+
+const LOGO_HEIGHT = 46;
 const CONTENT_W = PAGE.width - PAGE.margin * 2;
 /** Space kept free at the bottom of each page for the footer. */
 const FOOTER_SPACE = 46;
@@ -86,9 +89,15 @@ export function renderInvoicePdf(inv: InvoiceDocument): Promise<Buffer> {
 
     /* ── Header: brand + seller (left), document title + numbers (right) ── */
     pdf.rect(0, 0, PAGE.width, 6).fill(C.brand);
-    let y = 34;
-    pdf.font('Times-Bold').fontSize(26).fillColor(C.brand).text(inv.seller.brandName, L, y);
-    y = pdf.y + 2;
+    let y = 30;
+    const img = logoImage();
+    if (img) {
+      pdf.image(img, L, y, { height: LOGO_HEIGHT });
+      y += LOGO_HEIGHT + 8;
+    } else {
+      pdf.font('Times-Bold').fontSize(26).fillColor(C.brand).text(inv.seller.brandName, L, y + 4);
+      y = pdf.y + 2;
+    }
     pdf.font('Helvetica-Bold').fontSize(9).fillColor(C.ink).text(inv.seller.legalName, L, y, { width: 270 });
     pdf.font('Helvetica').fontSize(8.5).fillColor(C.muted);
     for (const line of inv.seller.addressLines) pdf.text(line, { width: 270 });

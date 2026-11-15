@@ -27,7 +27,7 @@ export default () => ({
     address: process.env.INVOICE_ADDRESS ?? '14/8/A, Chowdhuri Para Street|Chowdhuri Para, Near Doltala|Halisahar 743134',
     /** Registered state; with a GSTIN, the GSTIN's state code wins. */
     state: process.env.INVOICE_STATE ?? 'West Bengal',
-    email: process.env.INVOICE_EMAIL ?? 'support@shreeni.example.com',
+    email: process.env.INVOICE_EMAIL ?? 'collection.shreeni@gmail.com',
     phone: process.env.INVOICE_PHONE ?? '+91 97485 94143',
     /** Up to 4 characters: "SHR" → SHR/26-27/0001. */
     prefix: (process.env.INVOICE_PREFIX ?? 'SHR').trim().toUpperCase(),

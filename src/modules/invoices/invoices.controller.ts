@@ -4,8 +4,21 @@ import { AdminOnly } from '../../common/authz/admin-only.decorator.js';
 import type { AuthenticatedRequest } from '../../common/authz/auth-user.js';
 import { CustomerOnly } from '../../common/authz/customer-only.decorator.js';
 import { RateLimit } from '../../common/rate-limit/rate-limit.guard.js';
+import { ApiProperty } from '@nestjs/swagger';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsUUID } from 'class-validator';
 import { TrackOrderDto } from '../orders/dto/order.dto.js';
-import { InvoicesService, type InvoiceFile } from './invoices.service.js';
+import { InvoicesService, MAX_LABELS, type InvoiceFile } from './invoices.service.js';
+
+/** `POST /admin/orders/labels` */
+export class ShippingLabelsDto {
+  @ApiProperty({ type: [String], format: 'uuid', minItems: 1, maxItems: MAX_LABELS, description: 'Order ids' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_LABELS)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  ids!: string[];
+}
 
 /** PDF download; never cached (it can contain personal details). */
 function download({ filename, pdf }: InvoiceFile): StreamableFile {
@@ -60,6 +73,16 @@ export class GuestInvoicesController {
 @Controller('admin/orders')
 export class AdminInvoicesController {
   constructor(private readonly invoices: InvoicesService) {}
+
+  /** Printable shipping labels (A6, four per A4 page) for the selected orders. */
+  @Post('labels')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({ description: 'Shipping labels as a PDF file' })
+  async labels(@Body() dto: ShippingLabelsDto) {
+    return download(await this.invoices.shippingLabels(dto.ids));
+  }
 
   @Get(':id/invoice')
   @Header('Cache-Control', 'private, no-store')
