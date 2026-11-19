@@ -58,4 +58,22 @@ export class UploadsController {
   uploadBanner(@UploadedFile() file: Express.Multer.File | undefined) {
     return this.uploads.uploadImage(file, ImagePaths.banner(), MAX_WIDTH.banner);
   }
+
+  /** → journal/{uuid}.webp (≤1600 px wide). Journal cover images and images inside posts. */
+  @Post('journal')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody(SINGLE_FILE_BODY)
+  @UseInterceptors(FileInterceptor('file', IMAGE_UPLOAD_LIMITS))
+  uploadJournal(@UploadedFile() file: Express.Multer.File | undefined) {
+    return this.uploads.uploadImage(file, ImagePaths.journal(), MAX_WIDTH.journal);
+  }
+
+  /** → journal/authors/{uuid}.webp (≤400 px wide). Journal author photos. */
+  @Post('journal-author')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody(SINGLE_FILE_BODY)
+  @UseInterceptors(FileInterceptor('file', IMAGE_UPLOAD_LIMITS))
+  uploadJournalAuthor(@UploadedFile() file: Express.Multer.File | undefined) {
+    return this.uploads.uploadImage(file, ImagePaths.journalAuthor(), MAX_WIDTH.journalAuthor);
+  }
 }

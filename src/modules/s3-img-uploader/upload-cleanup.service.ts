@@ -48,6 +48,20 @@ export class UploadCleanupService {
     return { deleted: true, key };
   }
 
+  /** Journal posts (cover, share image or inside the text) and author photos. */
+  private async journalUsage(url: string): Promise<string | null> {
+    const [post, author, inText] = await Promise.all([
+      this.prisma.journalPost.findFirst({ where: { OR: [{ coverImageUrl: url }, { ogImageUrl: url }] }, select: { id: true, title: true } }),
+      this.prisma.journalAuthor.findFirst({ where: { avatarUrl: url }, select: { id: true, name: true } }),
+      this.prisma.$queryRaw<{ id: string; title: string }[]>`
+        SELECT "id", "title" FROM "JournalPost" WHERE "content"::text LIKE ${'%' + url + '%'} LIMIT 1`,
+    ]);
+    if (post) return `the Journal post "${post.title}" (${post.id})`;
+    if (author) return `the Journal author "${author.name}" (${author.id})`;
+    if (inText[0]) return `the text of the Journal post "${inText[0].title}" (${inText[0].id})`;
+    return null;
+  }
+
   /** Human-readable description of the first record using this URL, or null. */
   private async findUsage(url: string): Promise<string | null> {
     const [productImage, category, banner, review] = await Promise.all([
@@ -82,6 +96,8 @@ export class UploadCleanupService {
     if (review) {
       return `a customer review on "${review.product.name}" (${review.id})`;
     }
+    const journal = await this.journalUsage(url);
+    if (journal) return journal;
     return null;
   }
 }

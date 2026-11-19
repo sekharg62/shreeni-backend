@@ -201,6 +201,7 @@ model Product {
   relatedTo      RelatedProduct[]       @relation("RelatedTo")
   reviews        Review[]
   homePick       HomePick?
+  journalPosts   JournalPostProduct[]
   cartItems      CartItem[]
   wishlistItems  WishlistItem[]
   orderItems     OrderItem[]
@@ -744,4 +745,160 @@ model InvoiceSequence {
   financialYear String   @id
   lastNumber    Int      @default(0)
   updatedAt     DateTime @updatedAt
+}
+
+// ───────────────────────────── The Shreeni Journal (blog) ─────────────────────────────
+
+enum JournalStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum JournalLinkKind {
+  INTERNAL
+  EXTERNAL
+}
+
+/// A named writer: shown on posts and on /journal/author/{slug} (named authors help E-E-A-T).
+model JournalAuthor {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(80)
+  slug        String   @unique
+  role        String?  @db.VarChar(80)
+  bio         String?  @db.VarChar(600)
+  avatarUrl   String?
+  /// { instagram?, x?, linkedin?, website? }
+  socialLinks Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts JournalPost[]
+}
+
+/// Topic hub, e.g. "Weave guides", "Saree care".
+model JournalCategory {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String   @db.VarChar(80)
+  slug           String   @unique
+  description    String?  @db.VarChar(500)
+  seoTitle       String?  @db.VarChar(70)
+  seoDescription String?  @db.VarChar(170)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  posts JournalPost[]
+}
+
+model JournalTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(50)
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  posts JournalPostTag[]
+}
+
+/// A Journal post. `content` is the editor's document (Tiptap JSON); the storefront HTML is built from it on
+/// every read, so internal links always use the target's CURRENT URL. Live = PUBLISHED and publishedAt <= now
+/// (a future publishedAt is a scheduled post).
+model JournalPost {
+  id             String        @id @default(uuid()) @db.Uuid
+  slug           String        @unique
+  title          String        @db.VarChar(150)
+  excerpt        String?       @db.VarChar(300)
+  content        Json
+  /// Table of contents built on save: [{ id, text, level }]
+  headings       Json          @default("[]")
+  wordCount      Int           @default(0)
+  readingMinutes Int           @default(1)
+  coverImageUrl  String?
+  coverAlt       String?       @db.VarChar(200)
+  status         JournalStatus @default(DRAFT)
+  publishedAt    DateTime?
+  isFeatured     Boolean       @default(false)
+  // SEO (each falls back to title / excerpt / cover)
+  seoTitle       String?       @db.VarChar(70)
+  seoDescription String?       @db.VarChar(170)
+  focusKeyword   String?       @db.VarChar(80)
+  canonicalUrl   String?
+  ogImageUrl     String?
+  noindex        Boolean       @default(false)
+  authorId       String?       @db.Uuid
+  categoryId     String?       @db.Uuid
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  author        JournalAuthor?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  category      JournalCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags          JournalPostTag[]
+  products      JournalPostProduct[]
+  links         JournalLink[]        @relation("JournalLinkFrom")
+  inboundLinks  JournalLink[]        @relation("JournalLinkToPost")
+  slugRedirects JournalSlugRedirect[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@index([authorId])
+}
+
+model JournalPostTag {
+  postId String @db.Uuid
+  tagId  String @db.Uuid
+
+  post JournalPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  JournalTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+}
+
+/// "Shop this story": products shown with a post.
+model JournalPostProduct {
+  postId    String @db.Uuid
+  productId String @db.Uuid
+  sortOrder Int    @default(0)
+
+  post    JournalPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  product Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([postId, productId])
+  @@index([productId])
+}
+
+/// Every link inside a post, rebuilt on each save: powers the "links out / linked from" reports.
+model JournalLink {
+  id           String          @id @default(uuid()) @db.Uuid
+  postId       String          @db.Uuid
+  kind         JournalLinkKind
+  /// PRODUCT | CATEGORY | POST | PAGE | URL
+  targetType   String          @db.VarChar(20)
+  /// id of the product / category / post linked to (null for pages and external URLs)
+  targetId     String?         @db.Uuid
+  /// set when the target is another Journal post (for "linked from")
+  targetPostId String?         @db.Uuid
+  href         String
+  anchorText   String          @db.VarChar(300)
+  /// "nofollow sponsored ugc" (external links)
+  rel          String?         @db.VarChar(60)
+  newTab       Boolean         @default(false)
+
+  post       JournalPost  @relation("JournalLinkFrom", fields: [postId], references: [id], onDelete: Cascade)
+  targetPost JournalPost? @relation("JournalLinkToPost", fields: [targetPostId], references: [id], onDelete: SetNull)
+
+  @@index([postId])
+  @@index([targetPostId])
+  @@index([targetType, targetId])
+}
+
+/// Old slugs of a post: the storefront answers them with a 301 to the current URL.
+model JournalSlugRedirect {
+  oldSlug   String   @id
+  postId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  post JournalPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
 }

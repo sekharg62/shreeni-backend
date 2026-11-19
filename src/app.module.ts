@@ -29,6 +29,7 @@ import { OrdersModule } from './modules/orders/orders.module.js';
 import { CustomersModule } from './modules/customers/customers.module.js';
 import { HomePicksModule } from './modules/home-picks/home-picks.module.js';
 import { InvoicesModule } from './modules/invoices/invoices.module.js';
+import { JournalModule } from './modules/journal/journal.module.js';
 import configuration from './config/configuration.js';
 import { validateEnv } from './config/env.validation.js';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
@@ -67,6 +68,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware.j
     CustomersModule,
     HomePicksModule,
     InvoicesModule,
+    JournalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

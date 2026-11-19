@@ -8,12 +8,16 @@ import { randomUUID } from 'node:crypto';
  *   categories/{categoryId}/banner-{uuid}.webp
  *   categories/{categoryId}/poster-{uuid}.webp
  *   products/{productId}/{uuid}.webp
+ *   journal/{uuid}.webp            (covers + images inside posts)
+ *   journal/authors/{uuid}.webp    (author photos)
  */
 export const ImagePaths = {
   banner: () => `banners/${randomUUID()}.webp`,
   categoryBanner: (categoryId: string) => `categories/${categoryId}/banner-${randomUUID()}.webp`,
   categoryPoster: (categoryId: string) => `categories/${categoryId}/poster-${randomUUID()}.webp`,
   product: (productId: string) => `products/${productId}/${randomUUID()}.webp`,
+  journal: () => `journal/${randomUUID()}.webp`,
+  journalAuthor: () => `journal/authors/${randomUUID()}.webp`,
 } as const;
 
 /** Max width per image kind (images are never enlarged). */
@@ -21,6 +25,8 @@ export const MAX_WIDTH = {
   banner: 1920,
   category: 1600,
   product: 1600,
+  journal: 1600,
+  journalAuthor: 400,
 } as const;
 
 /** Upload limits (input size — files shrink a lot after WebP conversion). */

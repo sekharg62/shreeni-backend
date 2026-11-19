@@ -27,6 +27,7 @@
     "db:seed": "prisma db seed",
     "db:import-pincodes": "tsx src/scripts/import-pincodes.ts",
     "db:seed-demo": "tsx src/scripts/seed-demo-products.ts",
+    "db:seed-journal": "tsx src/scripts/seed-demo-journal.ts",
     "db:backfill-invoices": "tsx src/scripts/backfill-invoices.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -52,6 +53,7 @@
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sanitize-html": "2.18.2",
     "sharp": "^0.35.5"
   },
   "devDependencies": {
@@ -66,6 +68,7 @@
     "@types/node": "^24.0.0",
     "@types/pdfkit": "0.17.7",
     "@types/pg": "^8.23.1",
+    "@types/sanitize-html": "2.16.2",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "^4.1.2",
     "dotenv": "^18.0.9",
